@@ -1,0 +1,50 @@
+sample_id	condition	BankID	ip_batch	sequencing_1	filename_1	input_1	sequencing_2	filename_2	input_2	Comment
+2_ATAC	old_ctr	NM-059	ip_1	batch1	02_05FS_00ICHauk_H3K27Ac_hs_i68.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+4_ATAC	old_ctr	NM-060	ip_1	batch1	04_05FT_00ICHauk_H3K27Ac_hs_i69.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+6_ATAC	old_ctr	NM-061	ip_1	batch1	06_05FU_00ICHauk_H3K27Ac_hs_i70.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+8_ATAC	old_ctr	NM-062	ip_1	batch1	08_05FV_00ICHauk_H3K27Ac_hs_i71.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+10_ATAC	old_ctr	NM-063	ip_1	batch1	10_05FW_00ICHauk_H3K27Ac_hs_i72.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+12	old_ctr	NM-064	ip_1	batch1	12_05FX_00ICHauk_H3K27Ac_hs_i73.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+14	old_ctr	NM-065	ip_2	batch1	14_05FY_00ICHauk_H3K27Ac_hs_i74.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+16	old_ctr	NM-066	ip_2	batch1	16_05FZ_00ICHauk_H3K27Ac_hs_i75.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+18_MOD	old_ctr	NM-067	ip_2	batch1	18_05G0_00ICHauk_H3K27Ac_hs_i76.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+20_MOD	old_ctr	NM-068	ip_2	batch1	20_05G1_00ICHauk_H3K27Ac_hs_i77.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+22	old_ctr	NM-069	ip_2	batch1	22_05G2_00ICHauk_H3K27Ac_hs_i78.fastq.gz	00_05G3_00ICHauk_Pooled_Input_Batch1_hs_i80.fastq.gz	NA	NA	NA	NA
+74_A4	young	NM-676	ip_5	batch2	74_05GC_00ICHauk_A4_H3K27Ac_hs_i90.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	74_05NT_00ICHauk_A4_H3K27Ac_hs_i90.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+78_A8	young	NM-662	ip_5	batch2	78_05GD_00ICHauk_A8_H3K27Ac_hs_i91.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	78_05NU_00ICHauk_A8_H3K27Ac_hs_i91.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+80_A10	young	NM-663	ip_5	batch2	80_05GE_00ICHauk_A10_H3K27Ac_hs_i92.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	80_05NV_00ICHauk_A10_H3K27Ac_hs_i92.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+83_A13	young	NM-680	ip_5	batch2	83_05GF_00ICHauk_A13_H3K27Ac_hs_i93.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	83_05NW_00ICHauk_A13_H3K27Ac_hs_i93.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+85_A15	young	NM-679	ip_5	batch2	85_05GG_00ICHauk_A15_H3K27Ac_hs_i94.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	85_05NX_00ICHauk_A15_H3K27Ac_hs_i94.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+56	old_ctr	NM-056	ip_4	batch2	56_05GA_00ICHauk_H3K27Ac_hs_i88.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	NA	NA	NA	There was not enough IP material to re-sequence :(
+46	old_ctr	NM-053	ip_3	batch2	46_05G8_00ICHauk_H3K27Ac_hs_i86.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	46_05NQ_00ICHauk_H3K27Ac_hs_i86.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+40	old_ctr	NM-050	ip_3	batch2	40_05G7_00ICHauk_H3K27Ac_hs_i85.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	40_05NP_00ICHauk_H3K27Ac_hs_i85.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+38	old_ctr	NM-045	ip_3	batch2	38_05G6_00ICHauk_H3K27Ac_hs_i84.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	38_05NO_00ICHauk_H3K27Ac_hs_i84.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+52	old_ctr	NM-058	ip_4	batch2	52_05G9_00ICHauk_H3K27Ac_hs_i87.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	52_05NR_00ICHauk_H3K27Ac_hs_i87.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+30	old_ctr	NM-039	ip_3	batch2	30_05G5_00ICHauk_H3K27Ac_hs_i82.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	30_05NN_00ICHauk_H3K27Ac_hs_i82.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+24	old_ctr	NM-047	ip_2	batch2	24_05G4_00ICHauk_H3K27Ac_hs_i81.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	24_05NM_00ICHauk_H3K27Ac_hs_i81.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	NA
+72_A2	down	NM-673	ip_5	batch2	72_05GB_00ICHauk_A2_H3K27Ac_hs_i89.fastq.gz	00_05GH_00ICHauk_Pooled_Input_Batch2_hs_i95.fastq.gz	batch5	72_05NY_00ICHauk_A2_H3K27Ac_hs_i95.fastq.gz	00_05O1_00ICHauk_Pooled_Input-A2_hs_i68.fastq.gz	This is here because the swap never happened (although we asked for it)
+71_A1	young	NM-678	ip_5	batch3	71_05GQ_00ICHauk_A1_H3K27Ac_hs_i75.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+75_A5	young	NM-681	ip_5	batch3	75_05GR_00ICHauk_A5_H3K27Ac_hs_i76.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+86_A16	young	NM-675	ip_5	batch3	86_05GU_00ICHauk_A16_H3K27Ac_hs_i80.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+77_A7	young	NM-677	ip_5	batch3	77_05GS_00ICHauk_A7_H3K27Ac_hs_i77.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+81_A11	young	NM-682	ip_5	batch3	81_05GT_00ICHauk_A11_H3K27Ac_hs_i78.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+66	old_ctr	NM-051	ip_5	batch3	66_05GO_00ICHauk_H3K27Ac_hs_i73.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+68	old_ctr	NM-054	ip_5	batch3	68_05GP_00ICHauk_H3K27Ac_hs_i74.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+42	old_ctr	NM-042	ip_3	batch3	42_05GL_00ICHauk_H3K27Ac_hs_i70.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+36	old_ctr	NM-041	ip_3	batch3	36_05GK_00ICHauk_H3K27Ac_hs_i69.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+34	old_ctr	NM-037	ip_3	batch3	34_05GJ_00ICHauk_H3K27Ac_hs_i68.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+64	old_ctr	NM-049	ip_4	batch3	64_05GN_00ICHauk_H3K27Ac_hs_i72.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+54	old_ctr	NM-055	ip_4	batch3	54_05GM_00ICHauk_H3K27Ac_hs_i71.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+26	old_ctr	NM-040	ip_3	batch3	26_05GI_00ICHauk_H3K27Ac_hs_i96.fastq.gz	00_05GV_00ICHauk_Pooled_Input_Batch3_hs_i81.fastq.gz	NA	NA	NA	NA
+73_A3	young	NM-670	ip_5	batch4	73_05H3_00ICHauk_A3_H3K27Ac_hs_i90.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+76_A6	young	NM-681	ip_5	batch4	76_05H4_00ICHauk_A6_H3K27Ac_hs_i91.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+79_A9	young	NM-664	ip_5	batch4	79_05H5_00ICHauk_A9_H3K27Ac_hs_i92.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+82_A12	young	NM-674	ip_5	batch4	82_05H6_00ICHauk_A12_H3K27Ac_hs_i93.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+84_A14	young	NM-665	ip_5	batch4	84_05H7_00ICHauk_A14_H3K27Ac_hs_i94.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+60	old_ctr	NM-048	ip_4	batch4	60_05H1_00ICHauk_H3K27Ac_hs_i88.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	batch5	60_05NS_00ICHauk_H3K27Ac_hs_i88.fastq.gz	00_05O0_00ICHauk_Pooled_Input-B2_hs_i96.fastq.gz	This sample was sequenced twice (in two different batches) because there was empty space in batch 5
+44	old_ctr	NM-044	ip_3	batch4	44_05GY_00ICHauk_H3K27Ac_hs_i85.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+48	old_ctr	NM-052	ip_3	batch4	48_05GZ_00ICHauk_H3K27Ac_hs_i86.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+62	old_ctr	NM-038	ip_4	batch4	62_05H2_00ICHauk_H3K27Ac_hs_i89.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+32	old_ctr	NM-046	ip_3	batch4	32_05GX_00ICHauk_H3K27Ac_hs_i84.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+28	old_ctr	NM-043	ip_3	batch4	28_05GW_00ICHauk_H3K27Ac_hs_i82.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	NA
+58	old_ctr	NM-057	ip_4	batch4	58_05H0_00ICHauk_H3K27Ac_hs_i87.fastq.gz	00_05H8_00ICHauk_Pooled_Input_Batch4_hs_i95.fastq.gz	NA	NA	NA	This is here because the swap never happened (although we asked for it)
