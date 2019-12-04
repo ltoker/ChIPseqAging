@@ -257,13 +257,3 @@ DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T,
 DESegResultsSex_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "sexM") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 DESegResultsAge_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "age") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
-#Repeat without PMI
-Model2 = as.formula(" ~ condition + sex + age + batch")
-DESeqOutAll_Full_noPMI <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, 
-                             meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg", sampleToFilter = paste(names(Outlier), collapse = "|"),
-                             FullModel = Model2, test = "Wald", FitType = "local")
-
-
-DESegResultsSex_FullAll_noPMI <- GetDESeqResults(DESeqOutAll_Full_noPMI, coef = "sexM") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-DESegResultsAge_FullAll_noPMI <- GetDESeqResults(DESeqOutAll_Full_noPMI, coef = "age") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-DESegResultsGroup_FullAll_noPMI <- GetDESeqResults(DESeqOutAll_Full_noPMI, coef = "conditionPD") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")

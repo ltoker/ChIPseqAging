@@ -24,7 +24,25 @@ Metadata %<>% filter(!SampleID  %in% c("X56", "X72")) %>% droplevels()
 Metadata <- merge(Metadata, FullMeta %>% select(Biobank.ID, Cohort, Age, Sex, PMI, PH, Clinical.diagnosis, Pathology.diagnosis, braak.tau, amyloid, braak.LB, apoE, Cause.of.death, Other.diseases, Drugs.last.year.of.life), by.x = "BankID", by.y = "Biobank.ID", sort = F)
 Metadata$Age <- as.numeric(as.character(Metadata$Age))
 Metadata %<>% mutate(Agef = cut(Age, 5, ordered_result = T))
+Metadata$AgeGroup <- sapply(Metadata$Age, function(x){
+  if(x < 20){
+    "Young"
+  } else if(x > 50){
+    "Old"
+  } else {
+    "Middle"
+  }
+}) %>% factor(levels = c("Middle", "Young", "Old"))
 
+Metadata$Cohort2 <- sapply(as.character(Metadata$Cohort), function(x){
+  if(x == "Netherlands Brain Bank"){
+    "NBB"
+  } else if(x == "Neuromics Tissue Bank"){
+    "PV"
+  } else {
+    NA
+  }
+})
 
 
 QC <- read.table("meta/all_samples_cc.txt", header = T, sep = "\t")

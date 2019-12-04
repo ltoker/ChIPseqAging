@@ -205,17 +205,17 @@ GetCollapsedMatrix <- function(countsMatrixAnnot, collapseBy, FilterBy, meta = M
   annoCol = data.frame(Cohort = meta$Cohort,
                        NeuNall_MSP = meta$NeuNall_MSP,
                        OligoMSP = meta$Oligo_MSP,
-                       AstrocyteMSP = meta$Astrocyte_MSP,
-                       MicrogliaMSP = meta$Microglia_MSP,
+                       #AstrocyteMSP = meta$Astrocyte_MSP,
+                       #MicrogliaMSP = meta$Microglia_MSP,
                        row.names = meta[[MetaSamleIDCol]])
   annoColors = list(Cohort = c("Netherlands Brain Bank" = "dodgerblue4" , "Neuromics Tissue Bank" = "chocolate1"),
                     Batch = c(batch1 = "cornflowerblue", batch3 = "darkolivegreen1", batch4 = "chartreuse4", batch5 = "darkgoldenrod1"),
                     Sex = c(F = "indianred4", M = "cornflowerblue"),
                     Age = c("darkseagreen1", "darkorchid4"),
                     OligoMSP = c("chartreuse4","gray97","maroon"),
-                    MicrogliaMSP = c("chartreuse4","gray97","maroon"),
-                    NeuNall_MSP = c("chartreuse4","gray97","maroon"),
-                    AstrocyteMSP = c("chartreuse4","gray97","maroon"))
+                    #MicrogliaMSP = c("chartreuse4","gray97","maroon"),
+                    #AstrocyteMSP = c("chartreuse4","gray97","maroon"),
+                    NeuNall_MSP = c("chartreuse4","gray97","maroon"))
 
   Plot <- pheatmap(SampleCor, angle_col = 90, na_col = "white",border_color = NA,
                    color = colorRampPalette(c("darkblue", "gold2"))(999),
