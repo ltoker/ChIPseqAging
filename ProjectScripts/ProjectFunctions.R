@@ -380,8 +380,9 @@ GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "Sam
 RunDESeq <- function(data, meta, normFactor=NULL, sampleToFilter = "none",  FullModel, ReducedModel = "~1", test = "Wald", UseModelMatrix = FALSE, FitType = "parametric", MetaSamleCol = "activemotif_id", SampleNameCol = "SampleName"){
   meta = meta[!grepl(sampleToFilter, meta[[MetaSamleCol]]),] %>% droplevels
   data = data[,as.character(meta[[SampleNameCol]])]
+  ModelMatrix <- model.matrix(FullModel, meta)
   
-  DESeqDS <- DESeqDataSetFromMatrix(countData = data, colData = meta, design = FullModel)
+  DESeqDS <- DESeqDataSetFromMatrix(countData = data, colData = meta, design = ModelMatrix)
   
   DESeqDS <-  estimateSizeFactors(DESeqDS)
   if(!is.null(normFactor)){
@@ -389,7 +390,6 @@ RunDESeq <- function(data, meta, normFactor=NULL, sampleToFilter = "none",  Full
   }
   DESeqDS <- estimateDispersions(DESeqDS, fitType = FitType)
   
-  ModelMatrix <- model.matrix(FullModel, meta)
   
   if(test == "Wald"){
     if(UseModelMatrix){
