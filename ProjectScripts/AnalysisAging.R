@@ -1,4 +1,4 @@
-source("/data/Rprojects/GeneralScripts/generalFunc.R")
+source("generalFunc.R")
 source("ProjectScripts/ProjectFunctions.R")
 ResultsPath = "AgingResults"
 
