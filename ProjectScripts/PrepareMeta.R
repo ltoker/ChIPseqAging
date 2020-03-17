@@ -27,7 +27,7 @@ Metadata %<>% mutate(Agef = cut(Age, 5, ordered_result = T))
 Metadata$AgeGroup <- sapply(Metadata$Age, function(x){
   if(x < 20){
     "Young"
-  } else if(x > 50){
+  } else if(x > 60){
     "Old"
   } else {
     "Middle"

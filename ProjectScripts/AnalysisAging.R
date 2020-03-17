@@ -2,11 +2,11 @@ source("generalFunc.R")
 source("ProjectScripts/ProjectFunctions.R")
 ResultsPath = "AgingResults"
 
-PeakLoc = "data/Peaks/"
-CountMatrixLoc = "data/all_counts.tsv.gz"
-CellTypePeakCountLoc = "data/NeuN_peak_counts.tsv"
+PeakLoc = "data/Peaks/" #This is the location (local) of the NarrowPeak files
+CountMatrixLoc = "data/all_counts.tsv.gz" #This is the count matrix of our samples in our peaks
+CellTypePeakCountLoc = "data/NeuN_peak_counts.tsv" #This is the count matrix of our samples is the cell type peaks
 
-Cohort = "Aging"
+Cohort = "AgingFiltered"
 
 if(!ResultsPath %in% list.dirs(full.names = F, recursive = F)){
   dir.create(ResultsPath)
@@ -25,19 +25,22 @@ source("ProjectScripts/PrepareMeta.R")
 
 #######################Create files to analyse the called peaks ##############################
 
+#Filter the samples 
+Metadata %<>% filter(AgeGroup != "Young") #this part is to filter samples
+
 # First for peaks called individually
 InputPeakSingleCalled <- list()
 InputPeakSingleCalled$PeakData <- as.list(as.character(Metadata$SampleID))
 names(InputPeakSingleCalled$PeakData) <- make.names(as.character(Metadata$SampleID))
 
-InputPeakSingleCalled$PeakData <- mclapply(InputPeakSingleCalled$PeakData, function(sbj){
+InputPeakSingleCalled$PeakData <- lapply(InputPeakSingleCalled$PeakData, function(sbj){
   fileName = paste0(PeakLoc, Metadata %>% filter(SampleID == sbj) %>% .$PeakFileSample)
   temp <- read.table(fileName, header = F, sep = "\t")
   names(temp) <- c("CHR", "START", "END", "PeakName", "Score", "Srand", "Enrichment", "pPvalue", "pQvalue", "OffsetFromStart")
   temp <- temp[!grepl("GL|hs", temp$CHR),] %>% droplevels()
   temp %<>% mutate(Length = END-START, pValue = 10^(-pPvalue)) %>% filter(pValue < 10^(-7))
   temp %>% arrange(CHR, START) %>% as(.,"GRanges")
-}, mc.cores = detectCores())
+})#, mc.cores = detectCores())
 
 InputPeakSingleCalled$UniquePeaks <- sapply(names(InputPeakSingleCalled$PeakData), function(sbj){
   temp <- InputPeakSingleCalled$PeakData[[sbj]]
@@ -92,7 +95,6 @@ ggplot(SampleStatMelted %>% filter(FinalBatch != "batch1"), aes(Age, Value, colo
   geom_smooth(method = "auto", color = "black") +
   facet_wrap(~Measure_type + condition , scales = "free", ncol = 2)
 
-ggsave(paste0(ResultsPath,"SingleCalledStat", Cohort, ".png"), plot = Plot, device = "png", width = 10, height = 6, dpi = 300)
 ggsave(paste0(ResultsPath,"SingleCalledStat", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 10, height = 6, dpi = 300 )
 
 lm(numReads ~ Agef + Sex + FinalBatch, data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
@@ -115,6 +117,7 @@ ggplot(SubDataMelt, aes(Age, Value, color = FinalBatch)) +
   geom_point() +
   geom_smooth(method = "auto", color = "black") +
   facet_wrap(~Measure_type, scales = "free", nrow = 2)
+ggsave(paste0(ResultsPath,"SingleCalledStatBatchCorrected", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 10, height = 6, dpi = 300 )
 
 ################ Repeat for peaks called on all samples combined ############
 InputPeakAllCalled <- list()
@@ -146,9 +149,6 @@ names(HTseqCounts) <- sapply(names(HTseqCounts), function(x){
 HTseqCounts %<>% mutate(Peak.Location = paste0("chr", Chr, ":", Start, "-", End))
 names(HTseqCounts)[2:4] <- c("CHR", "START", "END")
 
-#Arrange the samples to match Metadata order
-HTseqCounts %<>% select(c("Geneid", "CHR", "START", "END", "Strand",  "Length", as.character(Metadata$SampleID)))
-
 #Remove peaks in contig regions
 HTseqCounts <- HTseqCounts[!grepl("GL|hs", HTseqCounts$CHR),] %>% droplevels()
 
@@ -167,6 +167,10 @@ HTseqCounts <- HTseqCounts[-queryHits(blackListedPeaks),]
 
 #Remove peaks in contig regions and peaks with p > 10^-7 (as well as blacklisted peaks)
 HTseqCounts <- HTseqCounts %>% filter(Geneid %in% as.character(InputPeakAllCalled$PeakData$PeakName)) %>% droplevels()
+
+
+#Arrange the samples to match Metadata order
+HTseqCounts %<>% select(c("Geneid", "CHR", "START", "END", "Strand",  "Length", as.character(Metadata$SampleID)))
 
 HTseqCounts$MaxCount = apply(HTseqCounts %>% select(matches("^X")), 1, max)
 HTseqCounts %<>% mutate(NormalizedMaxCount = MaxCount/Length)  
@@ -251,7 +255,7 @@ rownames(countMatrix_filtered) <- as.character(countMatrixDF %>% filter(NormCoun
 # Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~AgeGroup + Sex + FinalBatch + Oligo_MSP + Microglia_MSP)
+Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + Microglia_MSP)
 DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -262,5 +266,5 @@ DESegResultsAge.L_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.L") 
 DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.Q") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
-DESegResultsAgeYoung_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupYoung") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-DESegResultsAgeOld_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupOld") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
+#DESegResultsAgeMiddle_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupMiddle") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
+#DESegResultsAgeOld_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupOld") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")

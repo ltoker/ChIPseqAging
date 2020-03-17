@@ -193,29 +193,27 @@ GetCollapsedMatrix <- function(countsMatrixAnnot, collapseBy, FilterBy, meta = M
   } else {
     CPMdata <- Count2CPM(subData)
   }
-  
   SampleCor <- cor(CPMdata, method = CorMethod)
   diag(SampleCor) <- NA
   MedianCor <- apply(SampleCor, 1, function(x) median(x, na.rm = T))
-  annoRow = data.frame(Cohort = meta$Cohort,
-                       Age = meta$Age,
+  annoRow = data.frame(Age = meta$Age,
                        Batch = meta$FinalBatch,
                        Sex = meta$Sex,
                        row.names = meta[[MetaSamleIDCol]])
   annoCol = data.frame(Cohort = meta$Cohort,
-                       NeuNall_MSP = meta$NeuNall_MSP,
+                       #NeuNall_MSP = meta$NeuNall_MSP,
                        OligoMSP = meta$Oligo_MSP,
                        #AstrocyteMSP = meta$Astrocyte_MSP,
-                       #MicrogliaMSP = meta$Microglia_MSP,
+                       MicrogliaMSP = meta$Microglia_MSP,
                        row.names = meta[[MetaSamleIDCol]])
   annoColors = list(Cohort = c("Netherlands Brain Bank" = "dodgerblue4" , "Neuromics Tissue Bank" = "chocolate1"),
                     Batch = c(batch1 = "cornflowerblue", batch3 = "darkolivegreen1", batch4 = "chartreuse4", batch5 = "darkgoldenrod1"),
                     Sex = c(F = "indianred4", M = "cornflowerblue"),
                     Age = c("darkseagreen1", "darkorchid4"),
-                    OligoMSP = c("chartreuse4","gray97","maroon"),
-                    #MicrogliaMSP = c("chartreuse4","gray97","maroon"),
+                    MicrogliaMSP = c("chartreuse4","gray97","maroon"),
                     #AstrocyteMSP = c("chartreuse4","gray97","maroon"),
-                    NeuNall_MSP = c("chartreuse4","gray97","maroon"))
+                    #NeuNall_MSP = c("chartreuse4","gray97","maroon")
+                    OligoMSP = c("chartreuse4","gray97","maroon"))
 
   Plot <- pheatmap(SampleCor, angle_col = 90, na_col = "white",border_color = NA,
                    color = colorRampPalette(c("darkblue", "gold2"))(999),
@@ -233,13 +231,13 @@ GetCollapsedMatrix <- function(countsMatrixAnnot, collapseBy, FilterBy, meta = M
 
 GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "SampleID"){
   if("CellTypeH3K27ac.tsv" %in% list.files("CellTypeH3K27ac")){
-    CellTypePeaks <- read.table("CellTypeH3K27ac/CellTypeH3K27ac.tsv", header = T, sep = "\t")
+    CellTypePeaks <- read.table("CellTypeH3K27ac/CellTypeH3K27ac.tsv", header = T, sep = "\t") #These are differentially acetylated peaks between NeuN+/NeuN- cells based on Girdhar et al.
   } else {
     source(paste0("ProjectScripts/CellProportions.R"))
   }
   #Get relative cell proportion for the samples based on differential NeuN positive and negative cell H3K27ac peaks  
   HTseqCountsSamples <- read.table(CellTypePeakCountLoc, header = T, sep = "\t")
-  HTseqCountsSamples %<>% select(-matches("60_05H1_00ICHauk_H3K27Ac_hs_i88")) #this sample was ra twice
+  HTseqCountsSamples %<>% select(-matches("60_05H1_00ICHauk_H3K27Ac_hs_i88")) #this sample was ran twice
   
   names(HTseqCountsSamples) <- sapply(names(HTseqCountsSamples), function(x){
     x = gsub(".*bamfiles.0?", "", x)
