@@ -111,13 +111,13 @@ SubData$AdjTotCovPercent <- ModelAdj(ModTotCov, adj=data.frame(effect = c("Final
 
 SubDataMelt <- gather(SubData, key = "Measure_type", value = "Value", matches("Adj"))
 
-ggplot(SubDataMelt, aes(Age, Value, color = FinalBatch)) +
+Plot <- ggplot(SubDataMelt, aes(Age, Value, color = FinalBatch)) +
   theme_classic(base_size = 14) +
   labs(x="", y="") +
   geom_point() +
   geom_smooth(method = "auto", color = "black") +
   facet_wrap(~Measure_type, scales = "free", nrow = 2)
-ggsave(paste0(ResultsPath,"SingleCalledStatBatchCorrected", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 10, height = 6, dpi = 300 )
+ggsave(paste0(ResultsPath,"SingleCalledStatBatchCorrected", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 6, height = 6, dpi = 300 )
 
 ################ Repeat for peaks called on all samples combined ############
 InputPeakAllCalled <- list()
