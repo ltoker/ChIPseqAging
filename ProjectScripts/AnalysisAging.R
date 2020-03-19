@@ -97,9 +97,9 @@ ggplot(SampleStatMelted %>% filter(FinalBatch != "batch1"), aes(Age, Value, colo
 
 ggsave(paste0(ResultsPath,"SingleCalledStat", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 10, height = 6, dpi = 300 )
 
-lm(numReads ~ Agef + Sex + FinalBatch, data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
-lm(UniquePeakPercent ~ Agef + Sex + FinalBatch + numReads, data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
-lm(TotalCovPercent ~ Agef + Sex + FinalBatch + numReads , data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
+lm(numReads ~ Age + Sex + FinalBatch, data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
+lm(UniquePeakPercent ~ Age + Sex + FinalBatch + numReads, data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
+lm(TotalCovPercent ~ Age + Sex + FinalBatch + numReads , data = InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")) %>% summary
 
 
 SubData <- InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")
@@ -118,6 +118,7 @@ Plot <- ggplot(SubDataMelt, aes(Age, Value, color = FinalBatch)) +
   geom_smooth(method = "auto", color = "black") +
   facet_wrap(~Measure_type, scales = "free", nrow = 2)
 ggsave(paste0(ResultsPath,"SingleCalledStatBatchCorrected", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 6, height = 6, dpi = 300 )
+closeDev()
 
 ################ Repeat for peaks called on all samples combined ############
 InputPeakAllCalled <- list()
@@ -178,17 +179,49 @@ HTseqCounts %<>% mutate(NormalizedMaxCount = MaxCount/Length)
 AllCalledData <- GetCountMatrixHTseq(HTseqCounts, OtherNormRegEx = "^C1orf43_|^CHMP2A_|^EMC7_|^GPI_|^PSMB2_|^PSMB4_|^RAB7A_|^REEP5_|^SNRPD3_|^VCP_|^VPS29", MetaSamleCol = "SampleID", countSampleRegEx = "^X", MetaCol = c("SampleID", "Sex", "Age", "Agef", "AgeGroup", "PMI", "Cohort", "FinalBatch", "numReads"))
 
 
-closeDev()
-
-
 ##### Get relative cell proportion for based on differential NeuN positive and negative cell H3K27ac peaks ##########  
 AllCalledData$SampleInfo <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
 
-pdf(paste0(ResultsPath, "SampleCorAllPeaks", Cohort, ".pdf"), useDingbats = F, width = 10, height = 8)
+
 countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)), collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "^X",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
-closeDev()
 
+#Get the pvalues for associasion of each covariate with the first 3 PCs
+PCAsamples <- prcomp(t(countMatrixFullAllCalled$CPMdata), scale. = T)
+countMatrixFullAllCalled$Metadata %<>% mutate(PC1 = PCAsamples$x[,1],
+                                              PC2 = PCAsamples$x[,2],
+                                              PC3 = PCAsamples$x[,3],
+                                              PC4 = PCAsamples$x[,4],
+                                              PC5 = PCAsamples$x[,5]) 
+VarExplained <- PCAsamples %>% summary() %>% .$importance %>%
+  .[2, 1:sum(grepl("^PC", names(countMatrixFullAllCalled$Metadata)))]*100 
+
+
+CovarPvalues <- sapply(grep("^PC", names(countMatrixFullAllCalled$Metadata), value = T), function(PC){
+  temp <- lm(as.formula(paste0(PC, "~ Age + Sex + FinalBatch + Oligo_MSP + Microglia_MSP + Endothelial_MSP+ NeuNall_MSP")),
+             data = countMatrixFullAllCalled$Metadata) %>% summary
+  temp$coefficients[-1,4]
+}, simplify = F) %>% do.call(cbind, .) %>% data.frame()
+
+names(CovarPvalues) <- paste0(names(CovarPvalues), "(", round(VarExplained, digits = 1), "%)")
+CovarPvalues %<>% mutate(Variable = factor(rownames(CovarPvalues), levels = rownames(CovarPvalues)))
+
+levels(CovarPvalues$Variable) <- c("Age", "Sex", grep("FinalBatch", levels(CovarPvalues$Variable), value = T),
+                                   grep("MSP", levels(CovarPvalues$Variable), value = T))
+
+CovarPvaluesMelt <- gather(CovarPvalues, key = "PC", value = "pValue", -Variable)
+CovarPvaluesMelt %<>% mutate(pPvalue = -log10(pValue)) 
+
+
+Plot  <- ggplot(CovarPvaluesMelt, aes(PC, Variable)) +
+  theme_classic(base_size = 13) +
+  theme(axis.text.x.top = element_text(angle = 90, vjust=0.5, hjust=0)) +
+  labs(x = "", y = "", title = "Association of variables with main PCs") +
+  geom_tile(aes(fill = pPvalue), colour = "white") +
+  scale_fill_gradient(high = "steelblue", low = "gray94", name = "-log10(p)") +
+  geom_text(aes(label = signif(pValue, 2))) 
+ggsave(paste0("AssociationWithPCs", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 10, height = 8, dpi = 300, useDingbats = F, path = ResultsPath)
+closeDev()
 
 
 countMatrixDF <- AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)) %>% data.frame %>% select(matches("Peak|^X"))
@@ -255,7 +288,7 @@ rownames(countMatrix_filtered) <- as.character(countMatrixDF %>% filter(NormCoun
 # Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + Microglia_MSP)
+Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + Endothelial_MSP)
 DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
