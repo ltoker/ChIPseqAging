@@ -197,6 +197,8 @@ GetCollapsedMatrix <- function(countsMatrixAnnot, collapseBy, FilterBy, meta = M
   SampleCor <- cor(CPMdata, method = CorMethod)
   diag(SampleCor) <- NA
   MedianCor <- apply(SampleCor, 1, function(x) median(x, na.rm = T))
+  meta$FinalBatch[is.na(meta$FinalBatch)] <- "batch1"
+  
   annoRow = data.frame(Age = meta$Age,
                        Batch = meta$FinalBatch,
                        Sex = meta$Sex,
@@ -207,20 +209,26 @@ GetCollapsedMatrix <- function(countsMatrixAnnot, collapseBy, FilterBy, meta = M
                        #AstrocyteMSP = meta$Astrocyte_MSP,
                        MicrogliaMSP = meta$Microglia_MSP,
                        row.names = meta[[MetaSamleIDCol]])
-  annoColors = list(Cohort = c("Netherlands Brain Bank" = "dodgerblue4" , "Neuromics Tissue Bank" = "chocolate1"),
-                    Batch = c(batch1 = "cornflowerblue", batch3 = "darkolivegreen1", batch4 = "chartreuse4", batch5 = "darkgoldenrod1"),
-                    Sex = c(F = "indianred4", M = "cornflowerblue"),
-                    Age = c("darkseagreen1", "darkorchid4"),
-                    MicrogliaMSP = c("chartreuse4","gray97","maroon"),
-                    #AstrocyteMSP = c("chartreuse4","gray97","maroon"),
-                    #NeuNall_MSP = c("chartreuse4","gray97","maroon")
-                    OligoMSP = c("chartreuse4","gray97","maroon"))
+  
+  annoColors <- list(Cohort = c("Netherlands Brain Bank" = "dodgerblue4" , "Neuromics Tissue Bank" = "chocolate1", "Marzi" = "grey"),
+                     Batch = c(batch1 = "cornflowerblue", batch3 = "darkolivegreen1", batch4 = "chartreuse4", batch5 = "darkgoldenrod1"),
+                     Sex = c(F = "indianred4", M = "cornflowerblue"))
+  
+  temp <- cbind(annoCol, annoRow)
+  
+  annoColors <- sapply(names(annoColors), function(x){
+    annoColors[[x]][names(annoColors[[x]]) %in% temp[[x]]]
+  },simplify = F)
+  
+  annoColors$Age <- c("darkseagreen1", "darkorchid4")
+  annoColors$MicrogliaMSP <- c("chartreuse4","gray97","maroon")
+  annoColors$OligoMSP <- c("chartreuse4","gray97","maroon")
 
   Plot <- pheatmap(SampleCor, angle_col = 90, na_col = "white",border_color = NA,
                    color = colorRampPalette(c("darkblue", "gold2"))(999),
                    annotation_col = annoCol,
                    annotation_row = annoRow,
-                   annotation_colors = annoColors,
+                   annotation_colors = annoColors[],
                    main = title, filename = paste0(ResultsPath, "SampleCorAllPeaks", Cohort, ".pdf"), width = 10, height = 8)
   
   return(list(countMatrix = subData,
