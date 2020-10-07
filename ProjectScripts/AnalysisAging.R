@@ -6,7 +6,7 @@ PeakLoc = "data/Peaks/" #This is the location (local) of the NarrowPeak files
 CountMatrixLoc = "data/all_counts.tsv.gz" #This is the count matrix of our samples in our peaks
 CellTypePeakCountLoc = "data/NeuN_peak_counts.tsv" #This is the count matrix of our samples is the cell type peaks
 
-Cohort = "AgingFiltered"
+Cohort = "Aging"
 
 if(!ResultsPath %in% list.dirs(full.names = F, recursive = F)){
   dir.create(ResultsPath)
@@ -26,7 +26,8 @@ source("ProjectScripts/PrepareMeta.R")
 #######################Create files to analyse the called peaks ##############################
 
 #Filter the samples 
-Metadata %<>% filter(AgeGroup != "Young") #this part is to filter samples
+Metadata %<>% filter(Age > 15) #this part is to filter samples
+Metadata$Agef <- cut(Metadata$Age, breaks = 5, ordered_result = T)
 
 # First for peaks called individually
 InputPeakSingleCalled <- list()
@@ -105,9 +106,12 @@ lm(TotalCovPercent ~ Age + Sex + FinalBatch + numReads , data = InputPeakSingleC
 SubData <- InputPeakSingleCalled$SampleStat %>% filter(SampleName != "X72")
 ModUniquePeaks <- lm(UniquePeakPercent ~ Agef + Sex + FinalBatch, data = SubData)
 ModTotCov <- lm(TotalCovPercent ~ Agef + Sex + FinalBatch, data = SubData)
+ModnmReads <- lm(numReads ~ Agef + Sex + FinalBatch, data = SubData)
+
 
 SubData$AdjUniquePeakPercent <- ModelAdj(ModUniquePeaks, adj=data.frame(effect = c("FinalBatch", "Sex"), adjValue=c(0, 0)))
 SubData$AdjTotCovPercent <- ModelAdj(ModTotCov, adj=data.frame(effect = c("FinalBatch", "Sex"), adjValue=c(0, 0)))
+SubData$AdjnumReads <- ModelAdj(ModnmReads, adj=data.frame(effect = c("FinalBatch", "Sex"), adjValue=c(0, 0)))
 
 SubDataMelt <- gather(SubData, key = "Measure_type", value = "Value", matches("Adj"))
 
@@ -283,9 +287,9 @@ rownames(countMatrix_filtered) <- as.character(countMatrixDF %>% filter(NormCoun
 # 
 # 
 # 
-# #Detect outliers
-# MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, na.rm = TRUE))
-# Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
+#Detect outliers
+MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, na.rm = TRUE))
+Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
 Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + Endothelial_MSP)
@@ -299,7 +303,27 @@ DESegResultsAge.L_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.L") 
 DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.Q") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
+
+ADgenes <- read.table("data/ADgenes.txt", header = T, sep = "\t")
+PDgenes <- read.table("data/PDgenes.txt", header = T, sep = "\t")
+ALSgenes <- read.table("data/ALSgenes.txt", header = T, sep = "\t")
+
+DiseaseGenes <- list(AD = DESegResultsAge.L_FullAll %>% filter(symbol %in% ADgenes$Gene, !is.na(padj)) %>% 
+                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "AD"),
+                     PD = DESegResultsAge.L_FullAll %>% filter(symbol %in% PDgenes$Gene, !is.na(padj)) %>% 
+                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "PD"),
+                     ALS = DESegResultsAge.L_FullAll %>% filter(symbol %in% ALSgenes$Gene, !is.na(padj)) %>% 
+                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "ALS"),
+                     Other = DESegResultsAge.L_FullAll %>% filter(!symbol %in% c(as.character(ADgenes$Gene),
+                                                                                 as.character(PDgenes$Gene),
+                                                                                 as.character(ALSgenes$Gene)), !is.na(padj)) %>% 
+                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "Other")) %>%
+  rbindlist() %>% data.frame() %>% arrange(padj)
+ 
+ggplot(DiseaseGenes, aes(Disease, -log10(padj))) +
+  geom_violin() + geom_boxplot(outlier.shape = NA, width = 0.1)
+
 #DESegResultsAgeMiddle_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupMiddle") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-#DESegResultsAgeOld_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupOld") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
+#DESegResultsAgeOld_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupgoOld") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
 save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
