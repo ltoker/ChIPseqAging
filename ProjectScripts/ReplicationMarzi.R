@@ -360,7 +360,7 @@ DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.C")
 
 saveRDS(list(DESeqOutMarziAD = DESeqOutAll_Full,
              DESegResultsAD = DESegResultsGroup_FullAll,
-             DESeqOutMarziAging = DESegResultsSex_FullAll2,
+             DESeqOutMarziAging = DESeqOutAll_Full2,
              DESegResultsAgaingL = DESegResultsAge.L_FullAll), file = "AgingResults/OutputMarzi.Rds")
 
 DicovRepResult <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
@@ -378,13 +378,13 @@ AllThreeResults %>% filter(padj_Discov < 0.05, padj < 0.05) %>% dim()
 AllThreeResults %>% filter(padj_Discov < 0.05, !is.na(padj), !is.na(padj_Discov)) %>% dim()
 AllThreeResults %>% filter(padj < 0.05, !is.na(padj), !is.na(padj_Discov)) %>% dim()
 
-dhyper(55, 1753, 41947-1753, 1593)
+phyper(55-1, 1753, 41947-1753, 1593, lower.tail = F)
 
 AllThreeResults %>% filter(padj_Replic < 0.05, padj < 0.05 ) %>% dim()
 AllThreeResults %>% filter(padj_Replic < 0.05,  !is.na(padj), !is.na(padj_Replic)) %>% dim()
 AllThreeResults %>% filter(padj < 0.05,  !is.na(padj), !is.na(padj_Replic)) %>% dim()
 
-dhyper(3, 64, 41947-64, 1593)
+phyper(3-1, 64, 41947-64, 1593, lower.tail = F)
 
 
 
@@ -396,7 +396,7 @@ AllThreeResults %>% filter(padj_Replic < 0.05, !is.na(padj_Discov)) %>% dim()
 AllThreeResults %<>% mutate(SumStatAll = stat + stat_Discov + stat_Replic)
 AllThreeResults %<>% mutate(SumStatAgeing = stat_Discov + stat_Replic)
 
-dhyper(10, 64, 41921-64, 1770)
+phyper(10-1, 64, 41921-64, 1770, lower.tail = F)
 
-                      )
-save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
+                      
+save.image("AgingResults/WS_MarziData.Rda")
