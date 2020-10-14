@@ -73,7 +73,7 @@ Metadata <- merge(Metadata %>% select(-NeuralProportion), MetadataSup %>% select
 Metadata %<>% select(-MergeColumn)
 Metadata %<>% filter(!duplicated(SampleID))
 
-Metadata$Agef <- cut(Metadata$Age, breaks = 3, ordered_result = T)
+Metadata$Agef <- cut(Metadata$Age, breaks = 5, ordered_result = T)
 
       
 rownames(Metadata) <- Metadata$SampleID %>% as.character()
@@ -134,7 +134,10 @@ countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData
                                                collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "GSM",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
 
-lm(RiP_NormMeanRatioOrg~Age+Group+Sex+Oligo_MSP+Endothelial_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(RiP_NormMeanRatioOrg~Age+Group+Sex+Oligo_MSP+Endothelial_MSP+Microglia_MSP+NeuNall_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(NeuNall_MSP~Age+Group+Sex+Oligo_MSP+Microglia_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(Microglia_MSP~Age+Group+Sex+NeuNall_MSP+Oligo_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(Oligo_MSP~Age+Group+Sex+NeuNall_MSP+Microglia_MSP+Endothelial_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
 
 #Filter peaks with low counts
 
@@ -190,7 +193,7 @@ MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, 
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + Group + Oligo_MSP + NeuNall_MSP + Microglia_MSP)
+Model = as.formula(~Agef + Sex + Group + Oligo_MSP + NeuNall_MSP + Microglia_MSP + Endothelial_MSP)
 DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -200,19 +203,21 @@ DESegResultsSex_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "SexM") %>% 
 #DESegResultsAge_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Age") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 DESegResultsGroup_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "GroupAD") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
+
+                      
 temp <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% select(PeakName, log2FoldChange, stat, pvalue, padj),
               DESegResultsGroup_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, log2FoldChange, stat, pvalue, padj),
               by = "PeakName", suffixes = c("_AgingAll", "_MarziAD"))
 
-ggplot(temp, aes(stat_AgingAll, stat_MarziAD)) + geom_point()
+ggplot(temp %>% filter(padj_AgingAll < 0.05), aes(stat_AgingAll, stat_MarziAD)) + geom_point()
 
-cor.test(~stat_AgingAll + stat_MarziAD, data = temp %>% filter(pvalue_AgingAll < 0.05))
+cor.test(~stat_AgingAll + stat_MarziAD, data = temp %>% filter(padj_AgingAll < 0.05))
 
 temp %>% filter(padj_AgingAll < 0.05, padj_MarziAD < 0.05) %>% dim()
 temp %>% filter(padj_AgingAll < 0.05) %>% dim()
 temp %>% filter(padj_MarziAD < 0.05) %>% dim()
 
-dhyper(90, 1840, 615890-1840, 2689)
+dhyper(59, 1840, 61589-1840, 1725)
 
 
 ############################################################
@@ -338,7 +343,7 @@ MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, 
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef2 + Sex + Oligo_MSP + Endothelial_MSP)
+Model = as.formula(~Agef + Sex + Oligo_MSP + Endothelial_MSP)
 DESeqOutAll_Full2 <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -347,10 +352,16 @@ DESeqOutAll_Full2 <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, M
 DESegResultsSex_FullAll2 <- GetDESeqResults(DESeqOutAll_Full2, coef = "SexM") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 #DESegResultsAge_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Age") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
-DESegResultsAge.L_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef2.L") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef2.Q") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef2.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
+DESegResultsAge.L_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.L") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
+DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.Q") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
+DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
+
+
+saveRDS(list(DESeqOutMarziAD = DESeqOutAll_Full,
+             DESegResultsAD = DESegResultsGroup_FullAll,
+             DESeqOutMarziAging = DESegResultsSex_FullAll2,
+             DESegResultsAgaingL = DESegResultsAge.L_FullAll), file = "AgingResults/OutputMarzi.Rds")
 
 DicovRepResult <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
                         DESegResultsAge.L_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
@@ -359,86 +370,33 @@ DicovRepResult <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% s
 AllThreeResults <- merge(DicovRepResult, DESegResultsGroup_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
                         by = "PeakName")
 
-ggplot(AllThreeResults %>% filter( pvalue_Discov < 0.05), aes(stat_Discov, stat_Replic)) + geom_point()
-cor.test(~stat_Discov + stat, data = AllThreeResults  %>% filter(pvalue_Discov < 0.05))
-
-ggplot(AllThreeResults, aes(stat_Replic, stat)) + geom_point()
+ggplot(AllThreeResults %>% filter(pvalue_Discov < 0.05), aes(stat_Discov, stat_Replic)) + geom_point()
+cor.test(~stat_Discov + stat_Replic, data = AllThreeResults  %>% filter(pvalue_Discov < 0.05))
 
 
-packageF("metap")
-MetaP <- apply(DicovRepResult %>% select(matches("pvalue")), 1, function(x){
-  allmetap(x, method = "all") %>% select(p) %>% t
-}) %>% rbindlist() %>% data.frame()
-names(MetaP) <- rownames(allmetap(c(4.223084e-09, 7.586691e-04), method = "all"))
+AllThreeResults %>% filter(padj_Discov < 0.05, padj < 0.05) %>% dim()
+AllThreeResults %>% filter(padj_Discov < 0.05, !is.na(padj), !is.na(padj_Discov)) %>% dim()
+AllThreeResults %>% filter(padj < 0.05, !is.na(padj), !is.na(padj_Discov)) %>% dim()
+
+dhyper(55, 1753, 41947-1753, 1593)
+
+AllThreeResults %>% filter(padj_Replic < 0.05, padj < 0.05 ) %>% dim()
+AllThreeResults %>% filter(padj_Replic < 0.05,  !is.na(padj), !is.na(padj_Replic)) %>% dim()
+AllThreeResults %>% filter(padj < 0.05,  !is.na(padj), !is.na(padj_Replic)) %>% dim()
+
+dhyper(3, 64, 41947-64, 1593)
 
 
 
-DicovRepResult <- cbind(DicovRepResult, MetaP)
-
-DicovRepResult$sumlogAdj <- p.adjust(DicovRepResult$sumlog, method = "BH")
-
-
-ParkOmeSignif <- read.table("SignifPeaksOligEndoCorrect.tsv", header = T, sep = "\t")
-ParkOmeSignifPos <- as.character(ParkOmeSignif %>%
-                                   filter(!is.na(ParkOmeSignif$symbol), log2FoldChange > 0) %>% .$symbol)
-ParkOmeSignifNeg <- as.character(ParkOmeSignif %>%
-                                   filter(!is.na(ParkOmeSignif$symbol), log2FoldChange < 0) %>% .$symbol)
+AllThreeResults %>% filter(padj_Discov < 0.05, padj_Replic < 0.05, !is.na(padj_Replic), !is.na(padj_Discov)) %>% dim()
+AllThreeResults %>% filter(padj_Discov < 0.05, !is.na(padj_Replic)) %>% dim()
+AllThreeResults %>% filter(padj_Replic < 0.05, !is.na(padj_Discov)) %>% dim()
 
 
-packageF("pROC")
-Ranks <- which((DESegResultsAge.L_FullAll %>%
-                 arrange(pvalue) %>%
-                 filter(!duplicated(symbol)) %>%
-                  filter(log2FoldChange > 0) %>%
-                          .$symbol) %in% ParkOmeSignifPos)
+AllThreeResults %<>% mutate(SumStatAll = stat + stat_Discov + stat_Replic)
+AllThreeResults %<>% mutate(SumStatAgeing = stat_Discov + stat_Replic)
 
-temp <- DESegResultsAge.L_FullAll %>%
-  arrange(pvalue) %>%
-  filter(!duplicated(symbol)) %>% select(log2FoldChange, pvalue, symbol)
+dhyper(10, 64, 41921-64, 1770)
 
-temp$SignifDiscovery <- sapply(temp$symbol, function(x){
-  if(x %in% c(ParkOmeSignifPos, ParkOmeSignifNeg)){
-    "Yes"
-  } else {
-    "No"
-  }
-})
-
-plot.roc(roc(temp$SignifDiscovery, -log10(temp$pvalue)))
-
-Ranks2 <- which((DESegResultsAge.L_FullAll %>%
-                   arrange(pvalue) %>%
-                   filter(!duplicated(symbol)) %>%
-                   filter(log2FoldChange < 0) %>%
-                   .$symbol) %in% ParkOmeSignifNeg)
-                  
-                
-
-Ranks3 <- which((DESegResultsAge.L_FullAll %>% arrange(pvalue) %>%
-                  filter(!duplicated(symbol)) %>% .$symbol) %in% as.character(ParkOmeSignif %>%
-                                                                                filter(!is.na(ParkOmeSignif$symbol)) %>% .$symbol))
-
-
-ADgenes <- read.table("data/ADgenes.txt", header = T, sep = "\t")
-PDgenes <- read.table("data/PDgenes.txt", header = T, sep = "\t")
-ALSgenes <- read.table("data/ALSgenes.txt", header = T, sep = "\t")
-
-DiseaseGenes <- list(AD = DESegResultsAge.L_FullAll %>% filter(symbol %in% ADgenes$Gene, !is.na(padj)) %>% 
-                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "AD"),
-                     PD = DESegResultsAge.L_FullAll %>% filter(symbol %in% PDgenes$Gene, !is.na(padj)) %>% 
-                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "PD"),
-                     ALS = DESegResultsAge.L_FullAll %>% filter(symbol %in% ALSgenes$Gene, !is.na(padj)) %>% 
-                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "ALS"),
-                     Other = DESegResultsAge.L_FullAll %>% filter(!symbol %in% c(as.character(ADgenes$Gene),
-                                                                                 as.character(PDgenes$Gene),
-                                                                                 as.character(ALSgenes$Gene)), !is.na(padj)) %>% 
-                       filter(!duplicated(Peak_Gene)) %>% select(symbol, padj) %>% mutate(Disease = "Other")) %>%
-  rbindlist() %>% data.frame() %>% arrange(padj)
-
-ggplot(DiseaseGenes, aes(Disease, -log10(padj))) +
-  geom_violin() + geom_boxplot(outlier.shape = NA, width = 0.1)
-
-#DESegResultsAgeMiddle_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupMiddle") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-#DESegResultsAgeOld_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "AgeGroupgoOld") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
-
-#save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
+                      )
+save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
