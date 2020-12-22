@@ -6,11 +6,34 @@ packageF("pheatmap")
 packageF("GenomicRanges")
 packageF("annotatr")
 packageF("readr")
+packageF("org.Hs.eg.db")
+packageF("GenomicFeatures")
+packageF("AnnotationDbi")
 
-packageF("TxDb.Hsapiens.UCSC.hg19.knownGene")
-if (!requireNamespace("BiocManager", quietly = TRUE))
+if(!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
-#BiocManager::install("org.Hs.eg.db")
+}
+
+if(!requireNamespace("R.utils", quietly = TRUE)){
+  BiocManager::install("R.utils")
+}
+
+LiftOver_hg19to38 <- function(GRobj_hg19){
+  require('rtracklayer')
+  # Download chain
+  ch.file <- "./hg19ToHg38.over.chain"
+  ch.url <- "http://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/hg19ToHg38.over.chain.gz"
+  if (!file.exists(ch.file)) {
+    download.file(ch.url, paste0(ch.file, '.gz'))
+    R.utils::gunzip(paste0(ch.file, '.gz'))
+  }
+  
+  # Import chain mapping
+  ch <- import.chain(ch.file)
+  # Lift over coordinates
+  # Remember there may be duplicated positions after lifting over!
+  liftOver(GRobj_hg19, ch) %>% unlist
+}
 
 LocateEnhancers <- function(EnhancerFile = "EnhancerData/human_permissive_enhancers_phase_1_and_2_expression_count_matrix.txt"){
   EnhanceExp <- read.table(EnhancerFile, header = T, sep = "\t", quote = "")
@@ -45,8 +68,11 @@ GetEnhancerData <- function(obj, EnhancerData = NULL, EnhancerFile = "EnhancerDa
   return(ObjDF %>% as(.,"GRanges"))
 }
 
-GetGenomeAnno <- function(annots = c('hg19_basicgenes', 'hg19_genes_intergenic','hg19_genes_intronexonboundaries'),
-                          genome = "hg19"){
+GetGenomeAnno_UCSC <- function(annots = c('_basicgenes', '_genes_intergenic','_genes_intronexonboundaries'),
+                          genome = "hg38"){
+  
+  packageF(paste0("TxDb.Hsapiens.UCSC.", genome, ".knownGene"))
+  annots = paste0(genome, annots)
   annoFile <- build_annotations(genome = genome, annotations = annots)
   
   #Remove replicated annotations due to isoform data
@@ -64,6 +90,74 @@ GetGenomeAnno <- function(annots = c('hg19_basicgenes', 'hg19_genes_intergenic',
   #annoFileCollapsed <- GetEnhancerData(annoFileCollapsed)  #this part is removed since for now the enhancer information is not beeing used.
   return(annoFileCollapsed)
 }
+
+GetGenomeAnno_GENCODE <- function(GFT_file){
+  AnnoData <- rtracklayer::import.gff3(GFT_file) %>%
+    data.frame() 
+  
+  #Get promoter regions (one per gene)
+  PromoterData <- promoters((txdb), upstream = 1000, downstream = 0) %>%
+    data.frame() %>% mutate(exon_name = NA, region_type = "Promoters") %>% select(-tx_id)
+  
+  Up5KBData <- promoters(txdb, upstream = 5000, downstream = 0) %>%
+    data.frame() %>% mutate(exon_name = NA, region_type = "Up1to5Kb") %>% select(-tx_id)
+  
+  
+  Up5KBData %<>% mutate(end = end - 1000,
+                        width = width -1000)
+  
+  
+  temp <- rbind(PromoterData, Up5KBData)
+  CombinedAnnoA <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name), temp,
+                         by.x = "ID", by.y = "tx_name")
+  
+  
+  #Get introgenic regions
+  exbygene <- exonsBy(txdb, "gene")
+  intergenicRegions <- gaps(unlist(range(exbygene))) %>% data.frame() %>% mutate(exon_name  = NA,
+                                                                                 region_type = "intergenic")
+  
+  intergenicRegions <- cbind(data.frame(ID = NA,
+                                        gene_id = NA,
+                                        gene_type = NA,
+                                        gene_name = NA),
+                             intergenicRegions)
+  #Get intronic and exonic region
+  IntronData <- intronsByTranscript(txdb, use.names=TRUE) %>%
+    data.frame() %>% select(-group) %>% mutate(exon_name = NA, region_type = "Introns")
+  
+  ExonData <- exonsBy(txdb, by=c("tx"), use.names=TRUE) %>%
+    data.frame() %>% select(-group, -exon_id, -exon_rank) %>% mutate(region_type = "Exons")
+  
+  
+  #Get 5'UTR and 3'UTR
+  
+  UTR5Data <- fiveUTRsByTranscript(txdb, use.names=T) %>% 
+    data.frame() %>% select(-group, -exon_id, -exon_rank) %>% mutate(region_type = "5UTR")
+  
+  UTR3Data <- threeUTRsByTranscript(txdb, use.names=T) %>% 
+    data.frame() %>% select(-group, -exon_id, -exon_rank) %>% mutate(region_type = "3UTR")
+  
+  
+  temp2 <- rbind(IntronData, ExonData, UTR5Data, UTR3Data)
+  
+  CombinedAnnoB <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name), temp2, by.x = "ID", by.y = "group_name")
+  
+  
+  CombinedAnno <- rbind(CombinedAnnoA, CombinedAnnoB, intergenicRegions)
+  names(CombinedAnno)[names(CombinedAnno) %in% c("ID", "gene_name")] <- c("txt_id", "symbol")
+  
+  rm(temp, temp2)
+  
+  CombinedAnno %>%
+    mutate(UniqueRegion =  paste0(seqnames, ":", start, "-", end),
+           UniqueRegionGene = paste(UniqueRegion, symbol, sep = "_"),
+           UniqueRegionGeneType = paste(UniqueRegionGene, region_type, sep = "_"),
+           GeneAnnoType = paste(symbol, region_type, sep = "_")) %>%
+    filter(!duplicated(UniqueRegionGeneType)) %>% as(., "GRanges")
+  
+}
+
 
 GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activemotif_id", countSampleRegEx = "^X", 
                                 MetaCol = c("activemotif_id", "SampleID",  "rin", "condition", "sex", "age", "batch", "pm_hours", "library_size", 
