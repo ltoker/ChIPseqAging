@@ -1,4 +1,4 @@
-FullMeta <- read.table("meta/Neuromics_Brain_bank_v3_new_IF.csv", header = T, sep = "\t", quote = '"')
+FullMeta <- read.table("meta/Neuromics_Brain_bank_v10.txt", header = T, sep = "\t", quote = '"')
 Metadata <- read.table("meta/AgingChipMetadata.csv", header = T, sep = "\t", na.strings = "NA")
 Metadata$FinalBatch <- Metadata$sequencing_2 %>% as.character()
 Metadata$FinalBatch[is.na(Metadata$FinalBatch)] <- as.character(Metadata$sequencing_1)[is.na(Metadata$FinalBatch)]
@@ -21,7 +21,8 @@ Metadata$SampleID <- sapply(Metadata$FinalFileName, function(x){
 Metadata %<>% filter(!SampleID  %in% c("X56", "X72")) %>% droplevels()
 
 #Add the biobank metadata
-Metadata <- merge(Metadata, FullMeta %>% select(Biobank.ID, Cohort, Age, Sex, PMI, PH, Clinical.diagnosis, Pathology.diagnosis, braak.tau, amyloid, braak.LB, apoE, Cause.of.death, Other.diseases, Drugs.last.year.of.life), by.x = "BankID", by.y = "Biobank.ID", sort = F)
+Metadata <- merge(Metadata, FullMeta %>% select(Biobank_ID, Cohort, Age, Sex, PMI, PH, Neuromics_FINAL_DIAGNOSIS, Neuromics_Classification,
+                                                Braak_NFT,	CERAD,	Braak_LB,	apoE,	Thal_phase), by.x = "BankID", by.y = "Biobank_ID", sort = F)
 Metadata$Age <- as.numeric(as.character(Metadata$Age))
 Metadata %<>% mutate(Agef = cut(Age, 5, ordered_result = T))
 Metadata$AgeGroup <- sapply(Metadata$Age, function(x){
