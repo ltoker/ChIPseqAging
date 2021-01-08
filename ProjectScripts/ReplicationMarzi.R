@@ -1,16 +1,12 @@
-source("generalFunc.R")
+library(devtools)
+source_url("https://github.com/ltoker/GeneralRscripts/blob/main/generalFunc.R?raw=T")
+
 source("ProjectScripts/ProjectFunctions.R")
-packageF("tabulizer")
-
-ResultsPath = "MarziAD_OurPeaks"
-
-CountMatrixLoc = "data/all_counts.tsv.gz" #This is the count matrix of our samples in our peaks
-CellTypePeakCountLoc = "data/NeuN_peak_counts.tsv" #This is the count matrix of our samples is the cell type peaks
 
 CellTypePeakCountLoc = "DataMarzi/marzi_counts.tsv" #Count matrix of data from Marzi et al in the cell type peaks
+
 #CountMatrixLoc = "DataMarzi/MarziPaperCounts.tsv"  #Count matrix from Marzi et al 
 CountMatrixLoc = "DataMarzi/marzi_reads_on_our_aging_peaks.tsv.gz"  #Count matrix of data from Marzi et all quantified in our peaks
-Cohort = "MarziAD"
 
 if(!ResultsPath %in% list.dirs(full.names = F, recursive = F)){
   dir.create(ResultsPath)
@@ -19,10 +15,8 @@ ResultsPath = paste0(ResultsPath, "/")
 
 plotMA = DESeq2::plotMA
 
-annoFileCollapsed <- GetGenomeAnno(genome = "hg19")
-
-ResultsDiscovery <- readRDS("AgingResults/DESegResultsAge.L_FullAll.Rds")
-Deseq2OutDiscovery <- readRDS("AgingResults/DESeqOutAll_Full.Rds")
+ResultsDiscovery <- readRDS(paste0(DiscoveryResults, "/DESegResultsAge.L_FullAll.Rds"))
+Deseq2OutDiscovery <- readRDS(paste0(DiscoveryResults, "/DESeqOutAll_Full.Rds"))
 
 ################## Metadata ##############################################
 MetadataSup <- extract_tables("DataMarzi//41593_2018_253_MOESM1_ESM.pdf", pages = c(27:30)) %>% lapply(data.frame) %>% rbindlist() #Reading the metadata from the supplementary table 
@@ -79,6 +73,7 @@ Metadata$Agef <- cut(Metadata$Age, breaks = 5, ordered_result = T)
 rownames(Metadata) <- Metadata$SampleID %>% as.character()
 Metadata$FinalBatch <- NA
 Metadata$Cohort <- "Marzi"
+
 ############################# HTseq counts ######################################################################
 HTseqCounts <- read.table(CountMatrixLoc, header = T, sep = "\t")
 HTseqCounts$Chr <- sapply(as.character(HTseqCounts$Chr), function(x){
@@ -204,32 +199,12 @@ DESegResultsSex_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "SexM") %>% 
 DESegResultsGroup_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "GroupAD") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
 
-                      
-temp <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% select(PeakName, log2FoldChange, stat, pvalue, padj),
-              DESegResultsGroup_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, log2FoldChange, stat, pvalue, padj),
-              by = "PeakName", suffixes = c("_AgingAll", "_MarziAD"))
-
-ggplot(temp %>% filter(padj_AgingAll < 0.05), aes(stat_AgingAll, stat_MarziAD)) + geom_point()
-
-cor.test(~stat_AgingAll + stat_MarziAD, data = temp %>% filter(padj_AgingAll < 0.05))
-
-temp %>% filter(padj_AgingAll < 0.05, padj_MarziAD < 0.05) %>% dim()
-temp %>% filter(padj_AgingAll < 0.05) %>% dim()
-temp %>% filter(padj_MarziAD < 0.05) %>% dim()
-
-dhyper(59, 1840, 61589-1840, 1725)
-
 
 ############################################################
 #######  Repeat for aging, control samples only
 ############################################################
-ResultsPath = "MarziAD_OurPeaks"
-Cohort = "MarziAD"
+Cohort = "Marzi_Control"
 
-if(!ResultsPath %in% list.dirs(full.names = F, recursive = F)){
-  dir.create(ResultsPath)
-}
-ResultsPath = paste0(ResultsPath, "/")
 
 Metadata %<>% filter(Group == "Control")
 Metadata$Agef2 <- cut(Metadata$Age, breaks = 5, ordered_result = T)
@@ -361,42 +336,33 @@ DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.C")
 saveRDS(list(DESeqOutMarziAD = DESeqOutAll_Full,
              DESegResultsAD = DESegResultsGroup_FullAll,
              DESeqOutMarziAging = DESeqOutAll_Full2,
-             DESegResultsAgaingL = DESegResultsAge.L_FullAll), file = "AgingResults/OutputMarzi.Rds")
+             DESegResultsAgaingL = DESegResultsAge.L_FullAll), file = paste0(DiscoveryResults,"/OutputMarzi.Rds"))
 
 DicovRepResult <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
                         DESegResultsAge.L_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
-                        by = "PeakName", suffixes = c("_Discov", "_Replic"))
+                        by = "PeakName", suffixes = c("_Discov", "_Replic"), all.x = T, all.y = T)
 
 AllThreeResults <- merge(DicovRepResult, DESegResultsGroup_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
-                        by = "PeakName")
+                        by = "PeakName", all.x = T, all.y = T)
 
 ggplot(AllThreeResults %>% filter(pvalue_Discov < 0.05), aes(stat_Discov, stat_Replic)) + geom_point()
 cor.test(~stat_Discov + stat_Replic, data = AllThreeResults  %>% filter(pvalue_Discov < 0.05))
 
+GetHypergeometric <- function(DF = AllThreeResults, Col1, Col2) {
+  Data = DF %>% filter(!(is.na(.data[[Col1]]) | is.na(.data[[Col2]])))
+  AllRelPeaks = Data %>% nrow()
+  SignifBoth = Data %>% filter(.data[[Col1]] < 0.05, .data[[Col2]] < 0.05) %>% nrow()
+  Signif1 = Data %>% filter(.data[[Col1]] < 0.05) %>% nrow()
+  Signif2 = Data %>% filter(.data[[Col2]] < 0.05) %>% nrow()
+  
+  phyper(SignifBoth-1, Signif1, AllRelPeaks-Signif1, Signif2, lower.tail = F)
+}
 
-AllThreeResults %>% filter(padj_Discov < 0.05, padj < 0.05) %>% dim()
-AllThreeResults %>% filter(padj_Discov < 0.05, !is.na(padj), !is.na(padj_Discov)) %>% dim()
-AllThreeResults %>% filter(padj < 0.05, !is.na(padj), !is.na(padj_Discov)) %>% dim()
+GetHypergeometric(Col1 = "padj_Discov", Col2 = "padj")
+GetHypergeometric(Col1 = "padj_Discov", Col2 = "padj_Replic")
+GetHypergeometric(Col1 = "padj", Col2 = "padj_Replic")
 
-phyper(55-1, 1753, 41947-1753, 1593, lower.tail = F)
-
-AllThreeResults %>% filter(padj_Replic < 0.05, padj < 0.05 ) %>% dim()
-AllThreeResults %>% filter(padj_Replic < 0.05,  !is.na(padj), !is.na(padj_Replic)) %>% dim()
-AllThreeResults %>% filter(padj < 0.05,  !is.na(padj), !is.na(padj_Replic)) %>% dim()
-
-phyper(3-1, 64, 41947-64, 1593, lower.tail = F)
-
-
-
-AllThreeResults %>% filter(padj_Discov < 0.05, padj_Replic < 0.05, !is.na(padj_Replic), !is.na(padj_Discov)) %>% dim()
-AllThreeResults %>% filter(padj_Discov < 0.05, !is.na(padj_Replic)) %>% dim()
-AllThreeResults %>% filter(padj_Replic < 0.05, !is.na(padj_Discov)) %>% dim()
-
-
-AllThreeResults %<>% mutate(SumStatAll = stat + stat_Discov + stat_Replic)
-AllThreeResults %<>% mutate(SumStatAgeing = stat_Discov + stat_Replic)
-
-phyper(10-1, 64, 41921-64, 1770, lower.tail = F)
-
+closeAllConnections()
                       
-save.image("AgingResults/WS_MarziData.Rda")
+
+           
