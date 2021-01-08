@@ -1,5 +1,3 @@
-source("generalFunc.R")
-source("ProjectScripts/ProjectFunctions.R")
 #LDlinkR access token: 6c4c60024204
 Token = "6c4c60024204"
 BiocManager::install("LDlinkR")
@@ -105,21 +103,30 @@ saveRDS(LDsnpSCZRanges, "data/LDsnpSCZRanges.Rds")
 saveRDS(SCZsnpR2, "data/LDsnpSCZ.Rds")
 
 
-ASDsnps <- extract_tables("data/Groove_ADsup.pdf", pages = 45, method = "stream", output = "data.frame") %>%
-  rbindlist() %>% data.frame()
+#For ASD SNPs: the supplement table contains coordinates based on hg19
+if(!file.exists("data/ASDsnps.txt")){
+  ASDsnps <- extract_tables("data/Groove_ADsup.pdf", pages = 45, method = "stream", output = "data.frame") %>%
+    rbindlist() %>% data.frame()
+  
+  ASDsnps <- rbind(ASDsnps, extract_tables("data/Groove_ADsup.pdf", pages = 46, method = "stream", output = "data.frame") %>%
+                     rbindlist() %>% data.frame()) %>% data.frame()
+  
+  ASDsnps %<>% select(SNP, CHR, BP)
+  ASDsnps %<>% mutate(CHR = paste0("chr", CHR))
+  ASDsnps$BP <- sapply(ASDsnps$BP, function(x){
+    gsub(",", "", x) %>% as.numeric()
+  })
+  
+  ASDsnps %<>% mutate(PMID = "30804558") 
+  
+  write.table(ASDsnps, "data/ASDsnps.txt", sep = "\t", col.names = T, row.names = F)
+  rm(ASDsnps)
+  warning("Manualy edit the file since some of the SNP names are not read properly,\nand some are marked with 'm' at the end - read the Groove_ADsup.pdf for explanation")
 
-ASDsnps <- rbind(ASDsnps, extract_tables("data/Groove_ADsup.pdf", pages = 46, method = "stream", output = "data.frame") %>%
-  rbindlist() %>% data.frame()) %>% data.frame()
+  } else {
+    ASDsnps <- read.table("data/ASDsnps.txt", sep = "\t", header = T)
+}
 
-ASDsnps %<>% select(SNP, CHR, BP)
-ASDsnps %<>% mutate(CHR = paste0("chr", CHR))
-ASDsnps$BP <- sapply(ASDsnps$BP, function(x){
-  gsub(",", "", x) %>% as.numeric()
-})
-
-write.table(ASDsnps, "data/ASDsnps.txt", sep = "\t", col.names = T, row.names = F)
-
-ASDsnps <- read.table("data/ASDsnps.txt", sep = "\t", header = T)
 
 ASDnpR2 <- GetR2(ASDsnps)
 
@@ -130,7 +137,7 @@ saveRDS(ASDnpR2, "data/LDsnpASD.Rds")
 
 #MSP - Supp table S7 Patsopoulos et al. PMID  31604244
 MSsnps <- read.table("data/MSsnps.txt", sep = "\t", header = T) 
-NSsnpR2 <- GetR2(MSsnps)
+MSsnpR2 <- GetR2(MSsnps)
 
 LDsnpMSRanges <- GetLDblock(MSsnpR2, MSsnps)
 
