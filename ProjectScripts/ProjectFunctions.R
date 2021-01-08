@@ -9,6 +9,7 @@ packageF("readr")
 packageF("org.Hs.eg.db")
 packageF("GenomicFeatures")
 packageF("AnnotationDbi")
+packageF("tabulizer")
 
 if(!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
@@ -91,10 +92,9 @@ GetGenomeAnno_UCSC <- function(annots = c('_basicgenes', '_genes_intergenic','_g
   return(annoFileCollapsed)
 }
 
-GetGenomeAnno_GENCODE <- function(GFT_file){
-  AnnoData <- rtracklayer::import.gff3(GFT_file) %>%
+GetGenomeAnno_GENCODE <- function(GTF_file, txdb = txdb){
+  AnnoData <- rtracklayer::import.gff3(GTF_file) %>%
     data.frame() 
-  
   #Get promoter regions (one per gene)
   PromoterData <- promoters((txdb), upstream = 1000, downstream = 0) %>%
     data.frame() %>% mutate(exon_name = NA, region_type = "Promoters") %>% select(-tx_id)
@@ -208,7 +208,7 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
   
   PeakAnnoFile <- mergeByOverlaps(annoFileCollapsed, PeakLocation, maxgap = 0, type = "any", select = "all") %>% data.frame()
   names(PeakAnnoFile)[1:4] <- c("Region.CHR", "Region.START", "Region.END", "Region.width")
-  PeakAnnoFile %<>% select(-matches("strand|_id|^id|^PeakName|annoFileCollapsed"))
+  PeakAnnoFile %<>% select(-matches("strand|txt_id|^PeakName|annoFileCollapsed"))
   
   names(PeakAnnoFile)[grepl("PeakLocation", names(PeakAnnoFile))] <- c("Peak.CHR", "Peak.START", "Peak.END", "Peak.width", "PeakName")
   PeakAnnoFile %<>% mutate(Peak.Location = paste0(Peak.CHR, ":", Peak.START, "-", Peak.END))
