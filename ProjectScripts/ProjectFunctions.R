@@ -184,7 +184,7 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
   ReadsPerChr$CHR <- factor(ReadsPerChr$CHR, levels = c(as.character(c(1:22)), "X", "Y"))
   
   TotalSampleRead <- ReadsPerChr %>%  group_by(.dots = MetaSamleCol) %>% summarise(TotalCount = sum(SumReads)) %>% data.frame
-  TotalSampleRead <- merge(TotalSampleRead, Metadata %>% select(MetaCol), by = MetaSamleCol, merge = F)
+  TotalSampleRead <- merge(TotalSampleRead, Metadata %>% select(MetaCol), by = MetaSamleCol, sort = F)
   
   # TotalSampleRead %<>% mutate(FRiP = TotalCount/library_size,
   #                             Background = library_size - TotalCount)  
@@ -218,7 +218,8 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
   
   rownames(countsMatrix) <- countsDF$PeakName %>% as.character
   
-  countsMatrixAnnot <- merge(PeakAnnoFile, countsMatrix, by.x = "PeakName", by.y = "row.names", all.x = F, all.y = T)
+  countsMatrixAnnot <- merge(PeakAnnoFile, countsMatrix, by.x = "PeakName",
+                             by.y = "row.names", all.x = F, all.y = T)
   
   # Get the peaks annotated to house keeping genes
   if(is.null(OtherNormRegEx)){
@@ -251,7 +252,8 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
   SampleInfo %<>% mutate(RiP_NormMeanRatioOrg = TotalCount/MeanRatioOrg,
                          RiP_NormMeanRatioAll = TotalCount/MeanRatioAll)
   
-  HouseKeepingRatioPlot <- merge(HouseKeepingRatio, TotalSampleRead %>% select(c(MetaSamleCol, "TotalCount")), by = MetaSamleCol, sort = F)
+  HouseKeepingRatioPlot <- merge(HouseKeepingRatio, TotalSampleRead %>% select(c(MetaSamleCol, "TotalCount")),
+                                 by = MetaSamleCol, sort = F)
   MeasureCor <- cor(HouseKeepingRatioPlot %>% select(-matches("id|Sample|GSM")), method = "spearman")
   diag(MeasureCor) <- NA
   
