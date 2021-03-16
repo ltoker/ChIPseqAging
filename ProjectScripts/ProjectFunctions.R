@@ -180,11 +180,12 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
       mutate(SampleID = Subj)
   }, simplify = F) %>% rbindlist()
   
+  
   ReadsPerChr <- merge(ReadsPerChr, meta %>% select(MetaCol), by = MetaSamleCol, sort = F)
   ReadsPerChr$CHR <- factor(ReadsPerChr$CHR, levels = c(as.character(c(1:22)), "X", "Y"))
   
-  TotalSampleRead <- ReadsPerChr %>%  group_by(.dots = MetaSamleCol) %>% summarise(TotalCount = sum(SumReads)) %>% data.frame
-  TotalSampleRead <- merge(TotalSampleRead, Metadata %>% select(MetaCol), by = MetaSamleCol, sort = F)
+  TotalSampleRead <- ReadsPerChr %>%  group_by_at(MetaSamleCol) %>% summarise(TotalCount = sum(SumReads)) %>% data.frame
+  TotalSampleRead <- merge(Metadata %>% select(MetaCol), TotalSampleRead,  by = MetaSamleCol, sort = F)
   
   # TotalSampleRead %<>% mutate(FRiP = TotalCount/library_size,
   #                             Background = library_size - TotalCount)  
