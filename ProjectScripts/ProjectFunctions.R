@@ -180,11 +180,11 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
       mutate(SampleID = Subj)
   }, simplify = F) %>% rbindlist()
   
-  ReadsPerChr <- merge(ReadsPerChr, meta %>% select(MetaCol), by = MetaSamleCol)
+  ReadsPerChr <- merge(ReadsPerChr, meta %>% select(MetaCol), by = MetaSamleCol, sort = F)
   ReadsPerChr$CHR <- factor(ReadsPerChr$CHR, levels = c(as.character(c(1:22)), "X", "Y"))
   
   TotalSampleRead <- ReadsPerChr %>%  group_by(.dots = MetaSamleCol) %>% summarise(TotalCount = sum(SumReads)) %>% data.frame
-  TotalSampleRead <- merge(TotalSampleRead, Metadata %>% select(MetaCol), by = MetaSamleCol)
+  TotalSampleRead <- merge(TotalSampleRead, Metadata %>% select(MetaCol), by = MetaSamleCol, merge = F)
   
   # TotalSampleRead %<>% mutate(FRiP = TotalCount/library_size,
   #                             Background = library_size - TotalCount)  
@@ -474,7 +474,7 @@ GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "Sam
   }
   
   Metadata$NeuronProp <- rescale(to = c(0,1), x = CellTypePCA$x[,1])
-  Metadata <- merge(Metadata, MSP_out, by.x = MetaSamplCol, by.y = "Sample")
+  Metadata <- merge(Metadata, MSP_out, by.x = MetaSamplCol, by.y = "Sample", sort = F)
   return(Metadata)
 }
 
