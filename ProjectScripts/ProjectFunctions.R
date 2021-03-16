@@ -95,7 +95,7 @@ GetGenomeAnno_UCSC <- function(annots = c('_basicgenes', '_genes_intergenic','_g
 GetGenomeAnno_GENCODE <- function(GTF_file, txdb = txdb){
   AnnoData <- rtracklayer::import.gff3(GTF_file) %>%
     data.frame() 
-  #Get promoter regions (one per gene)
+  #Get promoter regions (one per transcrip)
   PromoterData <- promoters((txdb), upstream = 1000, downstream = 0) %>%
     data.frame() %>% mutate(exon_name = NA, region_type = "Promoters") %>% select(-tx_id)
   
@@ -110,7 +110,6 @@ GetGenomeAnno_GENCODE <- function(GTF_file, txdb = txdb){
   temp <- rbind(PromoterData, Up5KBData)
   CombinedAnnoA <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name), temp,
                          by.x = "ID", by.y = "tx_name")
-  
   
   #Get introgenic regions
   exbygene <- exonsBy(txdb, "gene")
@@ -141,7 +140,8 @@ GetGenomeAnno_GENCODE <- function(GTF_file, txdb = txdb){
   
   temp2 <- rbind(IntronData, ExonData, UTR5Data, UTR3Data)
   
-  CombinedAnnoB <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name), temp2, by.x = "ID", by.y = "group_name")
+  CombinedAnnoB <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name),
+                         temp2, by.x = "ID", by.y = "group_name")
   
   
   CombinedAnno <- rbind(CombinedAnnoA, CombinedAnnoB, intergenicRegions)
@@ -247,11 +247,11 @@ GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activ
   HouseKeepingRatio[[MetaSamleCol]] <- rownames(HouseKeepingRatio)
   
 
-  SampleInfo = merge(TotalSampleRead, HouseKeepingRatio, by = MetaSamleCol)
+  SampleInfo = merge(TotalSampleRead, HouseKeepingRatio, by = MetaSamleCol, sort = F)
   SampleInfo %<>% mutate(RiP_NormMeanRatioOrg = TotalCount/MeanRatioOrg,
                          RiP_NormMeanRatioAll = TotalCount/MeanRatioAll)
   
-  HouseKeepingRatioPlot <- merge(HouseKeepingRatio, TotalSampleRead %>% select(c(MetaSamleCol, "TotalCount")), by = MetaSamleCol)
+  HouseKeepingRatioPlot <- merge(HouseKeepingRatio, TotalSampleRead %>% select(c(MetaSamleCol, "TotalCount")), by = MetaSamleCol, sort = F)
   MeasureCor <- cor(HouseKeepingRatioPlot %>% select(-matches("id|Sample|GSM")), method = "spearman")
   diag(MeasureCor) <- NA
   
