@@ -132,10 +132,9 @@ countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData
 lm(RiP_NormMeanRatioOrg~Age+Group+Sex+Oligo_MSP+Endothelial_MSP+Microglia_MSP+NeuNall_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
 lm(NeuNall_MSP~Age+Group+Sex+Oligo_MSP+Microglia_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
 lm(Microglia_MSP~Age+Group+Sex+NeuNall_MSP+Oligo_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
-lm(Oligo_MSP~Age+Group+Sex+NeuNall_MSP+Microglia_MSP+Endothelial_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(Oligo_MSP~Age+Group+Sex+NeuNall_MSP+Microglia_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
 
 #Filter peaks with low counts
-
 countMatrixDF <- AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)) %>% data.frame %>% select(matches("Peak|GSM"))
 countMatrixDF$MedianCount <- apply(countMatrixDF %>% select(matches("GSM")), 1, mean)
 countMatrixDF %<>% mutate(NormCount = 200*MedianCount/Peak.width)
@@ -262,7 +261,7 @@ countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData
                                                collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "GSM",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
 
-lm(RiP_NormMeanRatioOrg~Age+Sex+Oligo_MSP+Endothelial_MSP, data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(RiP_NormMeanRatioOrg~Age+Sex+Oligo_MSP+Endothelial_MSP + Microglia_MSP + NeuNall_MSP , data = countMatrixFullAllCalled$Metadata) %>% summary()
 
 #Filter peaks with low counts
 
@@ -294,7 +293,7 @@ CovarPvalues <- sapply(grep("^PC", names(countMatrixFullAllCalled$Metadata), val
 names(CovarPvalues) <- paste0(names(CovarPvalues), "(", round(VarExplained, digits = 1), "%)")
 CovarPvalues %<>% mutate(Variable = factor(rownames(CovarPvalues), levels = rownames(CovarPvalues)))
 
-levels(CovarPvalues$Variable) <- c("Age", "Sex", "Group",
+levels(CovarPvalues$Variable) <- c("Age", "Sex",
                                    grep("MSP", levels(CovarPvalues$Variable), value = T))
 
 CovarPvaluesMelt <- gather(CovarPvalues, key = "PC", value = "pValue", -Variable)
@@ -318,7 +317,7 @@ MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, 
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + Oligo_MSP + Endothelial_MSP)
+Model = as.formula(~Agef + Sex + Oligo_MSP + NeuNall_MSP + Microglia_MSP)
 DESeqOutAll_Full2 <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -362,7 +361,6 @@ GetHypergeometric(Col1 = "padj_Discov", Col2 = "padj")
 GetHypergeometric(Col1 = "padj_Discov", Col2 = "padj_Replic")
 GetHypergeometric(Col1 = "padj", Col2 = "padj_Replic")
 
-closeAllConnections()
-                      
+
 
            
