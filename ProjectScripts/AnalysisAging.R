@@ -19,6 +19,34 @@ source("ProjectScripts/PrepareMeta.R")
 Metadata %<>% filter(Age > 15) #this part is to filter samples
 Metadata$Agef <- cut(Metadata$Age, breaks = 5, ordered_result = T)
 
+AgeDist <- Metadata %>% group_by(Cohort2, Sex) %>%
+  summarise(n = n(),
+            Mean = mean(Age), Min = min(Age), Max = max(Age)) %>%
+  data.frame()
+
+AgeDist$Age = apply(AgeDist[,4:6], 1, function(x){
+  paste0(round(x[1], digits = 0),
+         " (", round(x[2], digits = 0),
+         "-", round(x[3], digits =  0), ")")
+})
+
+write.table(AgeDist %>% select(Cohort2, Sex, n, Age), file = paste0(ResultsPath, "AgeDist.tsv"),
+            quote = F, sep = "\t", row.names = F, col.names = T)
+
+ggplot(Metadata, aes(FinalBatch, Age)) +
+  theme_minimal() +
+  labs(x = "") +
+  geom_boxplot(outlier.shape = NA, aes(fill = Cohort2), alpha = 0.7) +
+  geom_jitter(width = 0.2, aes(color = Sex)) +
+  scale_color_manual(values = MoviePalettes$BugsLife[c(4,2)]) +
+  scale_fill_manual(values = MoviePalettes$MoonRiseKingdomColors [c(8,2)], name = "Cohort")
+
+ggsave(paste0(ResultsPath, "AgeCohortBatchDist.pdf"), device = "pdf",
+       width = 6, height = 4, dpi = 300, useDingbats = F )
+ggsave(paste0(ResultsPath, "AgeCohortBatchDist.jpg"), device = "jpg",
+       width = 4, height = 2.5, dpi = 300)
+closeDev()
+
 # First for peaks called individually
 InputPeakSingleCalled <- list()
 InputPeakSingleCalled$PeakData <- as.list(as.character(Metadata$SampleID))
@@ -99,11 +127,12 @@ ggplot(SampleStatMelted %>% filter(FinalBatch != "batch1"), aes(Age, Value, colo
   geom_smooth(method = "auto", color = "black") +
   facet_wrap(~Measure_type + condition , scales = "free", ncol = 2)
 
-ggsave(paste0(ResultsPath,"SingleCalledStat", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 10, height = 6, dpi = 300 )
+ggsave(paste0(ResultsPath,"SingleCalledStat", Cohort, ".pdf"), plot = Plot,
+       device = "pdf", width = 10, height = 6, dpi = 300, useDingbats = F)
 
-lm(numReads ~ Age + Sex + FinalBatch, data = InputPeakSingleCalled$SampleStat) %>% summary
-lm(UniquePeakPercent ~ Age + Sex + FinalBatch + numReads, data = InputPeakSingleCalled$SampleStat) %>% summary
-lm(TotalCovPercent ~ Age + Sex + FinalBatch + numReads , data = InputPeakSingleCalled$SampleStat) %>% summary
+lm(numReads ~ Agef + Sex + FinalBatch, data = InputPeakSingleCalled$SampleStat) %>% summary
+lm(UniquePeakPercent ~ Agef + Sex + FinalBatch + numReads, data = InputPeakSingleCalled$SampleStat) %>% summary
+lm(TotalCovPercent ~ Agef + Sex + FinalBatch + numReads , data = InputPeakSingleCalled$SampleStat) %>% summary
 
 
 SubData <- InputPeakSingleCalled$SampleStat 
@@ -118,13 +147,16 @@ SubData$AdjnumReads <- ModelAdj(ModnmReads, adj=data.frame(effect = c("FinalBatc
 
 SubDataMelt <- gather(SubData, key = "Measure_type", value = "Value", matches("Adj"))
 
-Plot <- ggplot(SubDataMelt, aes(Age, Value, color = FinalBatch)) +
+Plot <- ggplot(SubDataMelt, aes(Age, log(Value), color = FinalBatch)) +
   theme_classic(base_size = 14) +
-  labs(x="", y="") +
-  geom_point() +
-  geom_smooth(method = "auto", color = "black") +
-  facet_wrap(~Measure_type, scales = "free", nrow = 2)
-ggsave(paste0(ResultsPath,"SingleCalledStatBatchCorrected", Cohort, ".pdf"), plot = Plot, device = "pdf", width = 6, height = 6, dpi = 300 )
+  theme_minimal() +
+  labs(x="", y="log(value)") +
+  geom_smooth(method = "auto", color = "black", size = 0.5) +
+  scale_color_manual(values =  MoviePalettes$MoonRiseKingdomColors[c(2, 4, 6, 10)]) +
+  geom_point(size = 1) +
+  facet_wrap(~Measure_type, scales = "free", nrow = 1)
+ggsave(paste0(ResultsPath,"SingleCalledStatBatchCorrected", Cohort, ".pdf"), plot = Plot, device = "pdf",
+       width = 8, height = 2, dpi = 300, useDingbats = F )
 closeDev()
 
 ################ Repeat for peaks called on all samples combined ############
@@ -207,7 +239,7 @@ AllCalledData$SampleInfo <- GetCellularProportions(AllCalledData$SampleInfo, Met
 countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)), collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "^X",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
 
-#Get the pvalues for associasion of each covariate with the first 3 PCs
+#Get the p-values for association of each covariates with the first 5 PCs
 PCAsamples <- prcomp(t(countMatrixFullAllCalled$CPMdata), scale. = T)
 countMatrixFullAllCalled$Metadata %<>% mutate(PC1 = PCAsamples$x[,1],
                                               PC2 = PCAsamples$x[,2],
@@ -253,15 +285,16 @@ countMatrixDF$baseMean <- apply(countMatrixDF %>% select(matches("^X")), 1, mean
 countMatrix_filtered <- countMatrixDF %>% filter(NormCount > 5) %>% select(matches("^X")) %>% as.matrix()
 rownames(countMatrix_filtered) <- as.character(countMatrixDF %>% filter(NormCount > 5) %>% .$PeakName)
 
-lmMod1 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + Oligo_MSP + Endothelial_MSP, data = countMatrixFullAllCalled$Metadata)
-lmMod2 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + NeuNall_MSP + Endothelial_MSP, data = countMatrixFullAllCalled$Metadata)
+lmMod1 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + Oligo_MSP + NeuNall_MSP, data = countMatrixFullAllCalled$Metadata)
+lmMod2 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + NeuNall_MSP + Oligo_MSP + Microglia_MSP, data = countMatrixFullAllCalled$Metadata)
+lmMod3 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + NeuNall_MSP + Oligo_MSP + Endothelial_MSP + Microglia_MSP, data = countMatrixFullAllCalled$Metadata)
 
 #Detect outliers
 MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, na.rm = TRUE))
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + Endothelial_MSP)
+Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + NeuNall_MSP + Microglia_MSP)
 DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -278,4 +311,3 @@ save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
 saveRDS(DESegResultsAge.L_FullAll, paste0(ResultsPath, "DESegResultsAge.L_FullAll.Rds"))
 saveRDS(DESeqOutAll_Full, paste0(ResultsPath, "DESeqOutAll_Full.Rds"))
 
-save()
