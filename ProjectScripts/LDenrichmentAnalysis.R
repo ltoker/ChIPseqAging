@@ -1,19 +1,19 @@
-source("generalFunc.R")
+library(devtools)
+source_url("https://github.com/ltoker/GeneralRscripts/blob/main/generalFunc.R?raw=T")
+
 source("ProjectScripts/ProjectFunctions.R")
 
-ResultsDiscovery <- readRDS("AgingResults/DESegResultsAge.L_FullAll.Rds")
-Deseq2OutDiscovery <- readRDS("AgingResults/DESeqOutAll_Full.Rds")
+ResultsDiscovery <- readRDS(paste0(DiscoveryResults, "/DESegResultsAge.L_FullAll.Rds"))
+Deseq2OutDiscovery <- readRDS(paste0(DiscoveryResults, "/DESeqOutAll_Full.Rds"))
 
 MarziAnalysis <- readRDS("AgingResults/OutputMarzi.Rds")
 
 
-
-
-DiseaseLDblocks <- list(PD = readRDS("data/LDsnpPDRanges.Rds"),
-                        AD = readRDS("data/LDsnpADRanges.Rds"),
-                        SCZ = readRDS("data/LDsnpSCZRanges.Rds"),
-                        ASD = readRDS("data/LDsnpASDRanges.Rds"),
-                        MS = readRDS("data/LDsnpMSRanges.Rds"))
+DiseaseLDblocks <- list(PD = readRDS("data/LDblocks/LDsnpPDRanges.Rds"),
+                        AD = readRDS("data/LDblocks/LDsnpADRanges.Rds"),
+                        SCZ = readRDS("data/LDblocks/LDsnpSCZRanges.Rds"),
+                        ASD = readRDS("data/LDblocks/LDsnpASDRanges.Rds"),
+                        MS = readRDS("data/LDblocks/LDsnpMSRanges.Rds"))
 
 
 
@@ -34,7 +34,7 @@ GetLDblockEnrich <- function(LDblocks, DESeqResult = ResultsDiscovery, StratNum 
                    nrow(PeakInfo)-nrow(TotalTestableDiseasePeaks),
                    nrow(TotalSignifPeaks), lower.tail = F)
   
-  
+  browser()
   BaseMeanQuantiles <- quantile(Diseasepeaks$baseMean, seq(1/StratNum, 1-1/StratNum, length.out = StratNum-1))
   WidthQuantiles <- quantile(Diseasepeaks$width, seq(1/StratNum, 1-1/StratNum, length.out = StratNum-1))
 
@@ -53,8 +53,6 @@ GetLDblockEnrich <- function(LDblocks, DESeqResult = ResultsDiscovery, StratNum 
 
 
   names(StratGroups) <- paste0("Strat_", 1:StratNum)
-
-
 
 
   RandomPeaks <- as.list(1:1000)
@@ -82,7 +80,7 @@ GetLDblockEnrich <- function(LDblocks, DESeqResult = ResultsDiscovery, StratNum 
               RandomPeaks = RandomPeaks))
 }
 
-seed(666)
+set.seed(666)
 
 DiseaseLDEnrich <- lapply(DiseaseLDblocks, function(disease){
   GetLDblockEnrich(disease)
@@ -94,7 +92,8 @@ AllDiseasePeaks <- sapply(names(DiseaseLDEnrich), function(disease){
   DiseaseLDEnrich[[disease]]$Diseasepeaks %>% mutate(Disease = disease)
 }, simplify = FALSE) %>% rbindlist %>% data.frame()
 
-AllDiscovery <- ResultsDiscovery %>% select(PeakName, log2FoldChange, pvalue, padj) %>% filter(!duplicated(PeakName), !is.na(padj))
+AllDiscovery <- ResultsDiscovery %>% select(PeakName, log2FoldChange, pvalue, padj) %>%
+  filter(!duplicated(PeakName), !is.na(padj))
 
 AllDiscovery <- merge(AllDiscovery, AllDiseasePeaks %>% select(PeakName, Disease), by = "PeakName", all.x = T)
 AllDiscovery$Disease[is.na(AllDiscovery$Disease)] <- "Neither"
