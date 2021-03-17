@@ -294,7 +294,7 @@ MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, 
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + NeuNall_MSP + Microglia_MSP)
+Model = as.formula(~Agef + Sex + FinalBatch + Oligo_MSP + NeuNall_MSP)
 DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")

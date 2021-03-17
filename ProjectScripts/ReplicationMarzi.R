@@ -187,7 +187,7 @@ MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, 
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + Group + Oligo_MSP + NeuNall_MSP + Microglia_MSP + Endothelial_MSP)
+Model = as.formula(~Agef + Sex + Group + Oligo_MSP + NeuNall_MSP + Microglia_MSP)
 DESeqOutAll_Full <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -261,7 +261,7 @@ countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData
                                                collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "GSM",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
 
-lm(RiP_NormMeanRatioOrg~Age+Sex+Oligo_MSP+Endothelial_MSP + Microglia_MSP + NeuNall_MSP , data = countMatrixFullAllCalled$Metadata) %>% summary()
+lm(log(RiP_NormMeanRatioOrg)~Agef+Sex+Oligo_MSP+Endothelial_MSP + Microglia_MSP + NeuNall_MSP , data = countMatrixFullAllCalled$Metadata) %>% summary()
 
 #Filter peaks with low counts
 
@@ -317,7 +317,7 @@ MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, 
 Outlier <- MedianCor[MedianCor < (median(MedianCor) - 1.5*iqr(MedianCor))]
 
 
-Model = as.formula(~Agef + Sex + Oligo_MSP + NeuNall_MSP + Microglia_MSP)
+Model = as.formula(~Agef + Sex + Oligo_MSP + NeuNall_MSP)
 DESeqOutAll_Full2 <- RunDESeq(data = countMatrix_filtered, UseModelMatrix = T, MetaSamleCol = "SampleID",SampleNameCol = "SampleID",
                              meta = countMatrixFullAllCalled$Metadata, normFactor = "MeanRatioOrg",
                              FullModel = Model, test = "Wald", FitType = "local")
@@ -344,8 +344,8 @@ DicovRepResult <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% s
 AllThreeResults <- merge(DicovRepResult, DESegResultsGroup_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
                         by = "PeakName", all.x = T, all.y = T)
 
-ggplot(AllThreeResults %>% filter(pvalue_Discov < 0.05), aes(stat_Discov, stat_Replic)) + geom_point()
-cor.test(~stat_Discov + stat_Replic, data = AllThreeResults  %>% filter(pvalue_Discov < 0.05))
+ggplot(AllThreeResults %>% filter(padj_Discov < 0.05), aes(stat_Discov, stat_Replic)) + geom_point()
+cor.test(~stat_Discov + stat_Replic, data = AllThreeResults  %>% filter(padj_Discov < 0.05, !is.na(padj_Replic)))
 
 GetHypergeometric <- function(DF = AllThreeResults, Col1, Col2) {
   Data = DF %>% filter(!(is.na(.data[[Col1]]) | is.na(.data[[Col2]])))
