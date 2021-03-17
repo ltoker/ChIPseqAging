@@ -9,8 +9,8 @@ Deseq2OutDiscovery <- readRDS(paste0(DiscoveryResults, "/DESeqOutAll_Full.Rds"))
 MarziAnalysis <- readRDS("AgingResults/OutputMarzi.Rds")
 
 
-DiseaseLDblocks <- list(PD = readRDS("data/LDblocks/LDsnpPDRanges.Rds"),
-                        AD = readRDS("data/LDblocks/LDsnpADRanges.Rds"),
+DiseaseLDblocks <- list(AD = readRDS("data/LDblocks/LDsnpADRanges.Rds"),
+                        PD = readRDS("data/LDblocks/LDsnpPDRanges.Rds"),
                         SCZ = readRDS("data/LDblocks/LDsnpSCZRanges.Rds"),
                         ASD = readRDS("data/LDblocks/LDsnpASDRanges.Rds"),
                         MS = readRDS("data/LDblocks/LDsnpMSRanges.Rds"))
@@ -34,7 +34,6 @@ GetLDblockEnrich <- function(LDblocks, DESeqResult = ResultsDiscovery, StratNum 
                    nrow(PeakInfo)-nrow(TotalTestableDiseasePeaks),
                    nrow(TotalSignifPeaks), lower.tail = F)
   
-  browser()
   BaseMeanQuantiles <- quantile(Diseasepeaks$baseMean, seq(1/StratNum, 1-1/StratNum, length.out = StratNum-1))
   WidthQuantiles <- quantile(Diseasepeaks$width, seq(1/StratNum, 1-1/StratNum, length.out = StratNum-1))
 
