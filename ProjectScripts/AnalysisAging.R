@@ -286,8 +286,34 @@ countMatrix_filtered <- countMatrixDF %>% filter(NormCount > 5) %>% select(match
 rownames(countMatrix_filtered) <- as.character(countMatrixDF %>% filter(NormCount > 5) %>% .$PeakName)
 
 lmMod1 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + Oligo_MSP + NeuNall_MSP, data = countMatrixFullAllCalled$Metadata)
-lmMod2 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + NeuNall_MSP + Oligo_MSP + Microglia_MSP, data = countMatrixFullAllCalled$Metadata)
-lmMod3 <- lm(log(RiP_NormMeanRatioOrg)~Agef + Sex + FinalBatch + NeuNall_MSP + Oligo_MSP + Endothelial_MSP + Microglia_MSP, data = countMatrixFullAllCalled$Metadata)
+lmMod2 <- lm(log(RiP_NormMeanRatioOrg)~Age + Sex + FinalBatch + NeuNall_MSP + Oligo_MSP, data = countMatrixFullAllCalled$Metadata)
+
+countMatrixFullAllCalled$Metadata$AdjustedRiP <- ModelAdj(lmMod2,
+                                                          adj=data.frame(effect = c("FinalBatch", "Sex",
+                                                                                    "NeuNall_MSP", "Oligo_MSP"), adjValue=c(0, 0, 0.5, 0.5)))
+ggplot(countMatrixFullAllCalled$Metadata, aes(Age, AdjustedRiP, color = FinalBatch)) +
+  theme_minimal()+
+  theme(legend.position = "bottom") +
+  labs(y = "Adjusted log(RiP)") +
+  geom_point() + geom_smooth(color = "black") +
+  scale_color_manual(values =  MoviePalettes$MoonRiseKingdomColors[c(2, 4, 6, 10)], name = "")
+
+
+AgeChanges <- sapply(names(countMatrixFullAllCalled$Metadata)[grepl("_MSP",
+                                                                    names(countMatrixFullAllCalled$Metadata))],
+                     function(celltype){
+  lm(as.formula(paste0(celltype, "~Age + Sex + FinalBatch")),
+     data = countMatrixFullAllCalled$Metadata) %>% summary %>% .$coef
+}, simplify = F)
+
+AgeChangesDF <- sapply(names(AgeChanges), function(CellType){
+  data <- AgeChanges[[CellType]] %>% data.frame()
+  names(data)[4] <- "pValue"
+  data[2,c(1,4)] %>% data.frame() %>% mutate(CellType = CellType)
+}, simplify = F) %>% rbindlist()
+
+write.table(AgeChangesDF, paste0(ResultsPath, "CellTypeAge.tsv"), sep = "\t",
+            row.names = F, col.names = T)
 
 #Detect outliers
 MedianCor <- apply(countMatrixFullAllCalled$SampleCor, 1, function(x) median(x, na.rm = TRUE))
@@ -306,6 +332,90 @@ DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.Q") 
 DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full, coef = "Agef.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
 
+ggMA(resultObject =  DESegResultsAge.L_FullAll %>% filter(!duplicated(PeakName)),
+     lims = c(-1.2,1.2),
+     geneColName = PeakName, contours = T, colour_pvalue = T )
+ggsave(paste0(ResultsPath,"DiscoveryMAplot.pdf"), device = "pdf",
+       width = 10, height = 4, dpi = 300, useDingbats = F)
+
+
+ADgenesSims <- read.table("data/ADgeneSims2020.txt", header = T, sep = "\t")
+ADgenesMeta <- read.table("data/ADsnps.txt", header = T, sep = "\t")
+
+ADsignif <- DESegResultsAge.L_FullAll %>% filter(!duplicated(Peak_Gene), padj < 0.05) %>% arrange(padj) %>%
+  select(PeakName, symbol, log2FoldChange, padj) %>%
+  filter(symbol %in% ADgenesSims$GeneSymbol) %>% .$symbol %>% table() %>% data.frame()
+names(ADsignif) <- c("GeneSymbol", "Number")
+
+ADall <- DESegResultsAge.L_FullAll %>% filter(!duplicated(Peak_Gene), !is.na(padj)) %>% arrange(padj) %>%
+  select(PeakName, symbol, log2FoldChange, padj) %>%
+  filter(symbol %in% ADgenesSims$GeneSymbol) %>% .$symbol %>% table() %>%  data.frame()
+
+names(ADall) <- c("GeneSymbol", "Number")
+
+ADgenePeaks <- merge(ADsignif, ADall, by = "GeneSymbol",
+                     all.x = T, all.y = T, suffixes = c("_Signif", "_All"))
+ADgenePeaks$Number_Signif[is.na(ADgenePeaks$Number_Signif)] <- 0
+ADgenePeaks %<>% arrange(desc(Number_Signif/Number_All), Number_All)
+
+ADgenePeaks$Change <- sapply(ADgenePeaks$GeneSymbol, function(gene){
+  temp <- DESegResultsAge.L_FullAll %>%
+    filter(!duplicated(Peak_Gene), padj < 0.05, symbol == gene) %>%
+    select(PeakName, symbol, log2FoldChange, padj)
+  if(nrow(temp) == 0){
+    NA
+  } else {
+    if(sum(temp$log2FoldChange < 0) == nrow(temp)){
+      "Hypoacetylated"
+    } else if(sum(temp$log2FoldChange > 0) == nrow(temp)){
+      "Hyperacetylated"
+    } else {
+      "Mixed"
+    }
+  }
+})
+
+ADgenePeaks %<>% mutate("DARs (Peaks)" = paste0(Number_Signif, " (", Number_All, ")"))
+ADgenePeaks <- merge(ADgenePeaks %>% select(-matches("Number")),
+                     ADgenesSims, by = "GeneSymbol", sort = F)
+
+write.table(ADgenePeaks, paste0(ResultsPath, "ADgeneDARs.tsv"), sep = "\t",
+            row.names = F, col.names = T) 
+
+TotalPeaks <- DESegResultsAge.L_FullAll %>%
+  filter(!duplicated(PeakName), !is.na(padj)) %>% nrow
+
+SignifPeaks <- DESegResultsAge.L_FullAll %>%
+  filter(!duplicated(PeakName), !is.na(padj), padj < 0.05) %>% nrow
+
+TotalADPeaks <- DESegResultsAge.L_FullAll %>%
+  filter(!is.na(padj), symbol %in% ADgenesSims$GeneSymbol) %>% filter(!duplicated(PeakName)) %>% nrow
+
+TotalSignifADPeaks <- DESegResultsAge.L_FullAll %>%
+  filter(padj < 0.05, symbol %in% ADgenesSims$GeneSymbol) %>% filter(!duplicated(PeakName)) %>% nrow
+
+phyper(TotalSignifADPeaks-1, TotalADPeaks,
+       TotalPeaks - TotalADPeaks, SignifPeaks, lower.tail = F)
+
+
+TotalGenes <- DESegResultsAge.L_FullAll %>%
+  filter(!is.na(symbol), !is.na(padj)) %>% .[!grepl("^MIR|^SNO", .$symbol),] %>%
+  .$symbol %>% unique %>% length
+
+SignifGenes <- DESegResultsAge.L_FullAll %>%
+  filter(!is.na(symbol), padj < 0.05) %>% .[!grepl("^MIR|^SNO", .$symbol),] %>%
+  .$symbol %>% unique %>% length
+
+TotalADGenes <- DESegResultsAge.L_FullAll %>%
+  filter(!is.na(padj), symbol %in% ADgenesSims$GeneSymbol) %>%
+  .$symbol %>% unique %>% length
+
+SignifADGenes <- DESegResultsAge.L_FullAll %>%
+  filter(padj < 0.05, symbol %in% ADgenesSims$GeneSymbol) %>%
+  .$symbol %>% unique %>% length
+
+phyper(SignifADGenes-1, TotalADGenes,
+       TotalGenes - TotalADGenes, SignifADGenes, lower.tail = F)
 
 save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
 saveRDS(DESegResultsAge.L_FullAll, paste0(ResultsPath, "DESegResultsAge.L_FullAll.Rds"))
