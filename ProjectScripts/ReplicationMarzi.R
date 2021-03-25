@@ -261,7 +261,7 @@ countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData
                                                collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "GSM",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
 
-lm(log(RiP_NormMeanRatioOrg)~Agef+Sex+Oligo_MSP+Endothelial_MSP + Microglia_MSP + NeuNall_MSP , data = countMatrixFullAllCalled$Metadata) %>% summary()
+
 
 #Filter peaks with low counts
 
@@ -330,7 +330,7 @@ DESegResultsAge.L_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.L")
 DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.Q") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
-
+ggplot()
 
 saveRDS(list(DESeqOutMarziAD = DESeqOutAll_Full,
              DESegResultsAD = DESegResultsGroup_FullAll,
@@ -344,8 +344,14 @@ DicovRepResult <- merge(ResultsDiscovery %>% filter(!duplicated(PeakName)) %>% s
 AllThreeResults <- merge(DicovRepResult, DESegResultsGroup_FullAll %>% filter(!duplicated(PeakName)) %>% select(PeakName, stat, pvalue, padj, log2FoldChange),
                         by = "PeakName", all.x = T, all.y = T)
 
-ggplot(AllThreeResults %>% filter(padj_Discov < 0.05), aes(stat_Discov, stat_Replic)) + geom_point()
-cor.test(~stat_Discov + stat_Replic, data = AllThreeResults  %>% filter(padj_Discov < 0.05, !is.na(padj_Replic)))
+ggplot(AllThreeResults %>% filter(!is.na(pvalue_Discov), !is.na(pvalue_Replic)), aes(stat_Discov, stat_Replic)) +
+  theme_minimal() +
+  geom_point() +
+  geom_density2d() +
+  geom_hline(yintercept = 0, color = "red", lty = "dashed")
+
+cor.test(~stat_Discov + stat_Replic, data = AllThreeResults  %>% filter(pvalue_Discov < 0.05,
+                                                                        !is.na(padj_Replic)))
 
 GetHypergeometric <- function(DF = AllThreeResults, Col1, Col2) {
   Data = DF %>% filter(!(is.na(.data[[Col1]]) | is.na(.data[[Col2]])))
@@ -363,4 +369,16 @@ GetHypergeometric(Col1 = "padj", Col2 = "padj_Replic")
 
 
 
+temp <- AllThreeResults %>% filter(padj_Replic < 0.05, padj_Discov < 0.05) %>% select(PeakName, log2FoldChange, log2FoldChange_Discov) 
+temp$Direction <- apply(temp, 1, function(x){
+  if(x[1]*x[2] > 0){
+    "Same"
+  } else {
+    "Different"
+    }
+  })
+
+
+temp <- plotCounts(Deseq2OutDiscovery, intgroup = "Age", returnData = T, gene = "Peak_1400")
+ggplot(temp,aes(Age, log(count))) + geom_point()
            
