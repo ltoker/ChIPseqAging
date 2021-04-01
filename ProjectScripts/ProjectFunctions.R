@@ -765,9 +765,48 @@ manhattan2 <- function (x, chr = "CHR", bp = "BP", p = "P", snp = "SNP", col = c
 }
 
 GetDESeq2ResultsRNA <- function(DESeqOut, coef, alpha = 0.05, indepFilter = TRUE){
-  DEresults <- results(DESeqOut, name = coef, alpha = alpha, format = "DataFrame", independentFiltering = indepFilter)
-  DEresults$GeneSymbol <- geneNames$hgnc_symbol[match(rownames(DEresults), geneNames$ensembl_gene_id)]
+  DEresults <- results(DESeqOut, name = coef, alpha = alpha,
+                       format = "DataFrame", independentFiltering = indepFilter) %>% data.frame
   DEresults$EnsemblID <- rownames(DEresults)
-  DEresults %<>% data.frame %>% filter(GeneSymbol != "")
+  DEresults <- merge(DEresults, geneNames %>% filter(!duplicated(gene_id)) %>%
+                       select(gene_id, gene_name, gene_type), by.x = "EnsemblID", by.y = "gene_id") %>% arrange(padj)
   return(DEresults)
+}
+
+DESeq2runRNA <- function(data, Meta, model){
+  ModelMatrix <- model.matrix(model, Meta)
+  DESeqDS <- DESeqDataSetFromMatrix(countData = data, colData = Meta, design = ModelMatrix)
+  DESeqDS <- estimateSizeFactors(DESeqDS)
+  DESeqDS <- estimateDispersions(DESeqDS, fitType = "local")
+  DESeqOut <- nbinomWaldTest(DESeqDS, modelMatrix = ModelMatrix)
+  return(DESeqOut)
+}
+
+PCAgo <- function(data, sampleRegEx = "SL", GOterm){
+  data %<>% filter(GeneSymbol %in% GOterm)
+  PCA <- prcomp(t(data %>%
+                    select(matches(sampleRegEx))), scale = T)
+  #Remove genes with different sign
+  if(sum(PCA$rotation[,1]) > 0){
+    GenesRM <- names(PCA$rotation[,1])[PCA$rotation[,1] < 0]
+  } else {
+    GenesRM <- names(PCA$rotation[,1])[PCA$rotation[,1] > 0]
+  }
+  
+  PCA <- prcomp(t(data %>% filter(!Probe %in% GenesRM) %>%
+                    select(matches(sampleRegEx))), scale = T)
+  #Fix direction 
+  if(sum(PCA$rotation[,1]) < 0){
+    PCA$x[,1]  = -1*PCA$x[,1]
+    PCA$rotation[,1]  = -1*PCA$rotation[,1]
+  }
+  return(list(GenesRM = data %>%
+                filter(Probe %in% GenesRM) %>% .$GeneSymbol,
+              GeneIn = data$GeneSymbol,
+              PCA = PCA))
+}
+
+AddGOmgpTometa <- function(Meta, MGP, IDcol = SampleIDcol){
+  temp <- MGP[match(Meta[[IDcol]], names(MGP))]
+  rescale(temp, c(0,1))
 }
