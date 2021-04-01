@@ -417,6 +417,62 @@ SignifADGenes <- DESegResultsAge.L_FullAll %>%
 phyper(SignifADGenes-1, TotalADGenes,
        TotalGenes - TotalADGenes, SignifADGenes, lower.tail = F)
 
+
+#Looking at the association with peak length
+PeakDist <- DESegResultsAge.L_FullAll %>% filter(!duplicated(PeakName)) %>%
+  select(PeakName, Peak.width, baseMean, stat, pvalue, padj)
+PeakDist$Change <- sapply(PeakDist$stat, function(x){
+  if(x < 0){
+    "Hypo"
+  } else {
+    "Hyper"
+  }
+})
+
+PeakDist$baseCount <- sapply(PeakDist$baseMean, function(x){
+  if(x < 100){
+    "low"
+  } else {
+    "high"
+  }
+})
+
+ggplot(PeakDist, aes(log10(Peak.width), -log10(pvalue))) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = -log10(0.05),color = "red", lty = "dashed") +
+  facet_wrap(~baseCount + Change, scales = "free")
+
+
+#Enrichment analysis using GREAT
+packageF("rGREAT")
+
+GetChIPenrich <- function(ChIPdata) {
+  HyperBed <- ChIPdata %>% filter(!duplicated(PeakName), padj < 0.05, log2FoldChange > 0) %>%
+    select(Peak.CHR, Peak.START, Peak.END, PeakName)
+  
+  HypoBed <- ChIPdata %>% filter(!duplicated(PeakName), padj < 0.05, log2FoldChange < 0) %>%
+    select(Peak.CHR, Peak.START, Peak.END, PeakName)
+  
+  BackgroundRegionsBed <- ChIPdata %>% filter(!duplicated(PeakName),
+                                              !is.na(padj)) %>%
+    select(Peak.CHR, Peak.START, Peak.END, PeakName)
+  
+  HyperRegions <- submitGreatJob(HyperBed, bg = BackgroundRegionsBed, species = "hg19")
+  GreatOut <- getEnrichmentTables(HyperRegions)
+  GreatOut2 <- plotRegionGeneAssociationGraphs(HyperRegions, type = 1)
+  
+  
+  HypoRegions <- submitGreatJob(HypoBed, bg = BackgroundRegionsBed, species = "hg19")
+  GreatOutHypo <- getEnrichmentTables(HypoRegions)
+  GreatOutHypo2 <- plotRegionGeneAssociationGraphs(HypoRegions, type = 1)
+  return(list(HyperEnrich = GreatOut, HypoEnrich = GreatOutHypo,
+              HyperAnno = GreatOut2, HypoAnno = GreatOutHypo2))
+}
+
+
+AgingEnrich <- GetChIPenrich(DESegResultsAge.L_FullAll)
+
 save.image(paste0(ResultsPath, "WS_", Cohort, ".Rda"))
 saveRDS(DESegResultsAge.L_FullAll, paste0(ResultsPath, "DESegResultsAge.L_FullAll.Rds"))
 saveRDS(DESeqOutAll_Full, paste0(ResultsPath, "DESeqOutAll_Full.Rds"))
