@@ -233,8 +233,53 @@ AllCalledData <- GetCountMatrixHTseq(HTseqCounts, OtherNormRegEx = "^C1orf43_|^C
 
 
 ##### Get relative cell proportion for based on differential NeuN positive and negative cell H3K27ac peaks ##########  
-AllCalledData$SampleInfo <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
+CellEstimateList <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
+CellEstimateList2 <- GetCellularProportions2(AllCalledData$SampleInfo,
+                                             AllCalledData$countsMatrixAnnot,
+                                             MetaSamplCol = "SampleID", normCol = "MeanRatioOrg")
+CellEstimateList3 <- GetCellularProportions3(AllCalledData$SampleInfo,
+                                             AllCalledData$countsMatrixAnnot,
+                                             MetaSamplCol = "SampleID")
 
+
+#Comparison to Human microglia expression from Galatro et al. 2017
+MicrogliaAging <- read.table("data/MicrogliaHumanAgingGalatro.txt", header = T, sep = "\t")
+MicogliaAll <- read.table("data/MicrogliaVsWholeBrainGalatro.txt", header = T, sep = "\t")
+
+MicrogliaSpecificHuman <- MicogliaAll %>% filter(gliaVSbrain_logFC > 3, adj.P.Val < 0.05) %>% .$GeneSymbol
+MicrogliaMSPgenes <- CellEstimateList$CellTypeSpecificPeaks$Microglia %>% filter(PeakName %in% rownames(CellEstimateList$PCAcellType$Microglia_MSP$rotation)) %>% .$symbol %>% unique
+MicrogliaMSPgenes <- rownames(CellEstimateList3$PCAcellType$Microglia_Genes_MSP$rotation)
+
+OverlapMicrogliaAll <- intersect(MicrogliaSpecificHuman, MicrogliaMSPgenes)
+OverlapAgeUP <- intersect((MicrogliaAging %>% filter(logFC > 0) %>% .$GeneSymbol), MicrogliaMSPgenes)
+OverlapAgeDown <- intersect((MicrogliaAging %>% filter(logFC < 0) %>% .$GeneSymbol), MicrogliaMSPgenes)
+
+
+
+BackGroundBed <- sapply(names(CellEstimateList$CellTypeSpecificPeaks), function(cellTypeName){
+  cellType = CellEstimateList$CellTypeSpecificPeaks[[cellTypeName]]
+  sapply(unique(cellType$PeakName), function(Peak){
+    data = cellType %>% filter(PeakName == Peak)
+    
+    if(nrow(data) > 1){
+      data$symbol = paste0(data$symbol, collapse = "/")
+      data = data[1,]
+    }
+    Background = c(500, 5*10^5)
+    data.frame(Chr = data$BroadPeak.seqnames, Start = c(data$BroadPeak.start-Background, rep(data$BroadPeak.end, 2)),
+               End = c(rep(data$BroadPeak.start, 2), data$BroadPeak.end + Background),
+               PeakName = paste0(Peak, c("NarrowUp", "WideUP", "NarrowDown", "WideDown")),
+               OrgPeak = Peak,
+               GeneSymbol = data$symbol,
+               cellType = cellTypeName) %>%
+      mutate(Width = End - Start,
+             UniqueCol = paste(PeakName, cellType,  sep = "_"))
+  }, simplify = F) %>% rbindlist() %>% data.frame()
+}, simplify = F) %>% rbindlist() %>% data.frame()
+
+write.table(BackGroundBed, paste0(ResultsPath, "BackgroundCellPeaks.tsv"), sep = "\t", row.names = F, col.names = T, quote = F)
+
+AllCalledData$SampleInfo <- CellEstimateList$Metadata
 
 countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)), collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "^X",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
