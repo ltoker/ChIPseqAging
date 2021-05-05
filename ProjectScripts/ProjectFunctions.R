@@ -69,94 +69,6 @@ GetEnhancerData <- function(obj, EnhancerData = NULL, EnhancerFile = "EnhancerDa
   return(ObjDF %>% as(.,"GRanges"))
 }
 
-GetGenomeAnno_UCSC <- function(annots = c('_basicgenes', '_genes_intergenic','_genes_intronexonboundaries'),
-                          genome = "hg38"){
-  
-  packageF(paste0("TxDb.Hsapiens.UCSC.", genome, ".knownGene"))
-  annots = paste0(genome, annots)
-  annoFile <- build_annotations(genome = genome, annotations = annots)
-  
-  #Remove replicated annotations due to isoform data
-  annoFileCollapsed <- annoFile %>% data.frame 
-  annoFileCollapsed %<>% mutate(UniqueRegion =  paste0(seqnames, ":", start, "-", end),
-                                UniqueRegionGene = paste(UniqueRegion, symbol, sep = "_"),
-                                UniqueRegionGeneType = paste(UniqueRegionGene, type, sep = "_"),
-                                GeneAnnoType = paste(symbol, type, sep = "_")) %>%
-    filter(!duplicated(UniqueRegionGeneType))
-  
-  
-  annoFileCollapsed %<>% as(., "GRanges")
-  
-  #ADD enhancer information
-  #annoFileCollapsed <- GetEnhancerData(annoFileCollapsed)  #this part is removed since for now the enhancer information is not beeing used.
-  return(annoFileCollapsed)
-}
-
-GetGenomeAnno_GENCODE <- function(GTF_file, txdb = txdb){
-  AnnoData <- rtracklayer::import.gff3(GTF_file) %>%
-    data.frame() 
-  #Get promoter regions (one per transcrip)
-  PromoterData <- promoters((txdb), upstream = 1000, downstream = 0) %>%
-    data.frame() %>% mutate(exon_name = NA, region_type = "Promoters") %>% select(-tx_id)
-  
-  Up5KBData <- promoters(txdb, upstream = 5000, downstream = 0) %>%
-    data.frame() %>% mutate(exon_name = NA, region_type = "Up1to5Kb") %>% select(-tx_id)
-  
-  
-  Up5KBData %<>% mutate(end = end - 1000,
-                        width = width -1000)
-  
-  
-  temp <- rbind(PromoterData, Up5KBData)
-  CombinedAnnoA <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name), temp,
-                         by.x = "ID", by.y = "tx_name")
-  
-  #Get introgenic regions
-  exbygene <- exonsBy(txdb, "gene")
-  intergenicRegions <- gaps(unlist(range(exbygene))) %>% data.frame() %>% mutate(exon_name  = NA,
-                                                                                 region_type = "intergenic")
-  
-  intergenicRegions <- cbind(data.frame(ID = NA,
-                                        gene_id = NA,
-                                        gene_type = NA,
-                                        gene_name = NA),
-                             intergenicRegions)
-  #Get intronic and exonic region
-  IntronData <- intronsByTranscript(txdb, use.names=TRUE) %>%
-    data.frame() %>% select(-group) %>% mutate(exon_name = NA, region_type = "Introns")
-  
-  ExonData <- exonsBy(txdb, by=c("tx"), use.names=TRUE) %>%
-    data.frame() %>% select(-group, -exon_id, -exon_rank) %>% mutate(region_type = "Exons")
-  
-  
-  #Get 5'UTR and 3'UTR
-  
-  UTR5Data <- fiveUTRsByTranscript(txdb, use.names=T) %>% 
-    data.frame() %>% select(-group, -exon_id, -exon_rank) %>% mutate(region_type = "5UTR")
-  
-  UTR3Data <- threeUTRsByTranscript(txdb, use.names=T) %>% 
-    data.frame() %>% select(-group, -exon_id, -exon_rank) %>% mutate(region_type = "3UTR")
-  
-  
-  temp2 <- rbind(IntronData, ExonData, UTR5Data, UTR3Data)
-  
-  CombinedAnnoB <- merge(AnnoData %>% select(ID, gene_id, gene_type, gene_name),
-                         temp2, by.x = "ID", by.y = "group_name")
-  
-  
-  CombinedAnno <- rbind(CombinedAnnoA, CombinedAnnoB, intergenicRegions)
-  names(CombinedAnno)[names(CombinedAnno) %in% c("ID", "gene_name")] <- c("txt_id", "symbol")
-  
-  rm(temp, temp2)
-  
-  CombinedAnno %>%
-    mutate(UniqueRegion =  paste0(seqnames, ":", start, "-", end),
-           UniqueRegionGene = paste(UniqueRegion, symbol, sep = "_"),
-           UniqueRegionGeneType = paste(UniqueRegionGene, region_type, sep = "_"),
-           GeneAnnoType = paste(symbol, region_type, sep = "_")) %>%
-    filter(!duplicated(UniqueRegionGeneType)) %>% as(., "GRanges")
-  
-}
 
 
 GetCountMatrixHTseq <- function(countsDF, meta = Metadata, MetaSamleCol = "activemotif_id", countSampleRegEx = "^X", 
@@ -395,11 +307,12 @@ GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "Sam
   
   CellTypePeaks %<>% mutate(Peak_Gene = paste(PeakName, symbol, sep = "_"))
   CellTypePeaks %<>% filter(!duplicated(Peak_Gene), !is.na(symbol))
-  
   #Identify cell type specific peaks by intersecting between the cell type specific genes and cell type specific peaks
   
   CellTypeSpecificPeaks <-lapply(CellType_genes, function(CellType){
-    MarkerPeaks <- CellTypePeaks %>% filter(symbol %in% CellType, !duplicated(Peak_Gene)) %>% select(PeakName, symbol, log2FoldChange, padj) %>% arrange(padj) 
+    MarkerPeaks <- CellTypePeaks %>% filter(symbol %in% CellType, !duplicated(Peak_Gene)) %>% select(PeakName, symbol, log2FoldChange, padj,
+                                                                                                     BroadPeak.seqnames, BroadPeak.start,
+                                                                                                     BroadPeak.end, BroadPeak.width) %>% arrange(padj) 
     if(nrow(MarkerPeaks) > 2){
       MarkerPeaks
     } else {
@@ -408,7 +321,9 @@ GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "Sam
   })
   
   #Add general NeuN enriched peaks
-  CellTypeSpecificPeaks$NeuNall <- CellTypePeaks %>% filter(log2FoldChange > 3, !duplicated(Peak_Gene)) %>% select(PeakName, symbol, log2FoldChange, padj) %>% arrange(padj)
+  CellTypeSpecificPeaks$NeuNall <- CellTypePeaks %>% filter(log2FoldChange > 3, !duplicated(Peak_Gene)) %>% select(PeakName, symbol, log2FoldChange, padj,
+                                                                                                                   BroadPeak.seqnames, BroadPeak.start,
+                                                                                                                   BroadPeak.end, BroadPeak.width) %>% arrange(padj)
   
   CellTypeSpecificPeaks <- CellTypeSpecificPeaks[!unlist(lapply(CellTypeSpecificPeaks, function(x) is.null(x)))]
   
@@ -452,6 +367,8 @@ GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "Sam
     rescale(CellType$x[,1], to = c(0,1))
   }) %>% do.call(cbind, .) %>% data.frame %>% mutate(Sample = row.names(.))
   
+  
+  
   #Add general calculation based on ratio between bneuronal and glial peaks, this is for comparing different regions
   counMatrixSamples2 <- counMatrixSamples2[rownames(counMatrixSamples2) %in% (CellTypePeaks %>% filter(abs(log2FoldChange) > 3, !duplicated(PeakName)) %>% .$PeakName),]
   
@@ -478,7 +395,252 @@ GetCellularProportions <- function(Metadata, normCol = NULL, MetaSamplCol = "Sam
   
   Metadata$NeuronProp <- rescale(to = c(0,1), x = CellTypePCA$x[,1])
   Metadata <- merge(Metadata, MSP_out, by.x = MetaSamplCol, by.y = "Sample", sort = F)
-  return(Metadata)
+  return(list(Metadata = Metadata,
+              CellTypeCounts = counMatrixSamples,
+              CellTypeSpecificPeaks = CellTypeSpecificPeaks,
+              PCAcellType = PCAcellType,
+              VarianceExplained = VarianceExplained))
+}
+
+GetCellularProportions2 <- function(Metadata, AnnoExpData, normCol = NULL, MetaSamplCol = "SampleID"){
+  AnnoExpData %<>% mutate(Peak_Gene = paste(PeakName, symbol, sep = "_")) 
+  #Filter only peaks annotated to one gene
+  PeakGenes <- AnnoExpData %>% filter(!duplicated(Peak_Gene), region_type != "intergenic") %>% .$PeakName %>% table
+  UniquePeaks <- AnnoExpData %>% filter(PeakName %in% names(PeakGenes)[PeakGenes == 1], region_type != "intergenic",
+                                        !duplicated(Peak_Gene))
+  
+  counMatrixSamples <- AnnoExpData %>% filter(!duplicated(PeakName)) %>%
+    select(as.character(Metadata[[MetaSamplCol]])) %>% as.matrix()
+  rownames(counMatrixSamples) <- as.character(AnnoExpData %>% filter(!duplicated(PeakName)) %>%
+                                                .$PeakName)
+  
+  if(!is.null(normCol)){
+    samplesCPM <- sapply(1:ncol(counMatrixSamples), function(i){
+      counMatrixSamples[,i]/Metadata[[normCol]][i]
+    })
+    colnames(samplesCPM) <- colnames(counMatrixSamples)
+  } else {
+    samplesCPM <- Count2CPM(counMatrixSamples)
+  }
+  counMatrixSamples2 <- log2(samplesCPM +1)
+  
+  #Remove none unique peaks
+  CPMunique <- counMatrixSamples2[rownames(counMatrixSamples2) %in% UniquePeaks$PeakName,]
+  
+  #Keep only high counts
+  CPMunique <- CPMunique[apply(CPMunique, 1, max) >= 3,]
+  
+  ##### Get expression-based cell type marker genes ###########
+  
+  if(!"homologene" %in% rownames(installed.packages())){
+    install_github("oganm/homologene", force = T)
+  }
+  library(homologene)
+  
+  if(!"markerGeneProfile" %in% rownames(installed.packages())){
+    install_github("oganm/markerGeneProfile", force = T)
+  }
+  library(markerGeneProfile)
+  data("mouseMarkerGenesCombined")
+  
+  CellType_genes <- mouseMarkerGenesCombined$Cortex
+  for(i in 1:length(CellType_genes)){
+    
+    CellType_genes[[i]] <- as.vector(mouse2human(CellType_genes[[i]])$humanGene)
+    
+  }
+  
+  #Identify cell type specific peaks by intersecting between the cell type specific genes and cell type specific peaks
+  
+  CellTypeSpecificPeaks <-lapply(CellType_genes, function(CellType){
+    MarkerPeaks <- UniquePeaks %>% filter(symbol %in% CellType) %>% select(PeakName, symbol, Peak.CHR, Peak.START,
+                                                                           Peak.END, Peak.width) 
+    if(nrow(MarkerPeaks) > 2){
+      MarkerPeaks
+    } else {
+      NULL
+    }
+  })
+  
+  CellTypeSpecificPeaks <- CellTypeSpecificPeaks[!unlist(lapply(CellTypeSpecificPeaks, function(x) is.null(x)))]
+  
+  CellTypeSpecificPeakNames <- lapply(CellTypeSpecificPeaks, function(CellType){
+    CellType %>% filter(!duplicated(PeakName)) %>% .$PeakName %>% as.character()
+  })
+  
+  ## Run PCA on celltype specific peaks (+ general Neuronal peaks) ##########
+  PCAcellType <- lapply(CellTypeSpecificPeakNames, function(CellType){
+    CellData <- CPMunique[rownames(CPMunique) %in% CellType,]
+    temp <- prcomp(t(CellData), scale. = T)
+    sumPC1 = sum(temp$rotation[,1])
+    if(sumPC1 < 0){
+      temp$rotation[,1] <- -1*temp$rotation[,1]
+      temp$x[,1] <- -1*temp$x[,1]
+    }
+    while(sum(temp$rotation[,1] > 0) < nrow(temp$rotation)){
+      CellData <- CPMunique[rownames(CPMunique) %in% rownames(temp$rotation)[temp$rotation[,1] > 0],]
+      temp <- prcomp(t(CellData), scale. = T)
+      sumPC1 = sum(temp$rotation[,1])
+      if(sumPC1 < 0){
+        temp$rotation[,1] <- -1*temp$rotation[,1]
+        temp$x[,1] <- -1*temp$x[,1]
+      }
+    }
+    temp
+  })
+  
+  #Remove cell types with < 3 peaks remaining
+  
+  
+  names(PCAcellType) <- paste0(names(PCAcellType), "_MSP")
+  
+  VarianceExplained <- lapply(PCAcellType, function(cell){
+    temp <- cell %>% summary
+    if(length(temp) > 3){
+     c(temp$importance %>% .[2,], NA, NA)[1:3]
+    } 
+  }) %>% do.call(rbind,.) %>% data.frame %>%
+    mutate(Peaks = unlist(lapply(PCAcellType, function(x) nrow(x$rotation))))
+  rownames(VarianceExplained) <- names(PCAcellType)
+  
+  MSP_out <- lapply(PCAcellType, function(CellType){
+    rescale(CellType$x[,1], to = c(0,1))
+  }) %>% do.call(cbind, .) %>% data.frame %>% mutate(Sample = row.names(.))
+  
+  
+  
+ 
+  Metadata <- merge(Metadata, MSP_out, by.x = MetaSamplCol, by.y = "Sample", sort = F)
+
+  return(list(Metadata = Metadata,
+              CellTypeSpecificPeaks = CellTypeSpecificPeaks,
+              PCAcellType = PCAcellType,
+              VarianceExplained = VarianceExplained))
+}
+
+GetCellularProportions3 <- function(Metadata, AnnoExpData, normCol = NULL, MetaSamplCol = "SampleID"){
+  AnnoExpData %<>% mutate(Peak_Gene = paste(PeakName, symbol, sep = "_")) 
+  #Filter only peaks annotated to one gene
+  PeakGenes <- AnnoExpData %>% filter(!duplicated(Peak_Gene), region_type != "intergenic") %>% .$PeakName %>% table
+  UniquePeaks <- AnnoExpData %>% filter(PeakName %in% names(PeakGenes)[PeakGenes == 1], region_type != "intergenic",
+                                        !duplicated(Peak_Gene))
+  
+  counMatrixSamples <- AnnoExpData %>% filter(!duplicated(PeakName)) %>%
+    select(as.character(Metadata[[MetaSamplCol]])) %>% as.matrix()
+  rownames(counMatrixSamples) <- as.character(AnnoExpData %>% filter(!duplicated(PeakName)) %>%
+                                                .$PeakName)
+  
+  if(!is.null(normCol)){
+    samplesCPM <- sapply(1:ncol(counMatrixSamples), function(i){
+      counMatrixSamples[,i]/Metadata[[normCol]][i]
+    })
+    colnames(samplesCPM) <- colnames(counMatrixSamples)
+  } else {
+    samplesCPM <- Count2CPM(counMatrixSamples)
+  }
+  counMatrixSamples2 <- log2(samplesCPM +1)
+  
+  #Remove none unique peaks
+  CPMunique <- counMatrixSamples2[rownames(counMatrixSamples2) %in% UniquePeaks$PeakName,]
+  
+  #Keep only high counts
+  CPMunique <- CPMunique[apply(CPMunique, 1, median) >= 3,]
+  
+  ##### Get expression-based cell type marker genes from RNAseq data ###########
+  load(paste0(ResultsPath, "RNAseq/PCAresults.Rda"))
+  
+  CellType_genes <- lapply(PCAresults$Boot_1$All, function(cellType){
+    rownames(cellType$rotation)
+  })
+  
+
+  CellTypeSpecificPeaks <-lapply(CellType_genes, function(CellType){
+    MarkerPeaks <- UniquePeaks %>% filter(symbol %in% CellType) %>% select(PeakName, symbol, Peak.CHR, Peak.START,
+                                                                           Peak.END, Peak.width) 
+    if(nrow(MarkerPeaks) > 2){
+      MarkerPeaks
+    } else {
+      NULL
+    }
+  })
+  
+  CellTypeSpecificPeaks <- CellTypeSpecificPeaks[!unlist(lapply(CellTypeSpecificPeaks, function(x) is.null(x)))]
+  
+  CellTypeSpecificPeakNames <- lapply(CellTypeSpecificPeaks, function(CellType){
+    CellType %>% filter(!duplicated(PeakName)) %>% select(symbol, PeakName)
+  })
+  
+  ## Run PCA on celltype specific peaks (+ general Neuronal peaks) ##########
+  PCAcellType <- lapply(CellTypeSpecificPeakNames, function(CellType){
+    CellDataAll <- CPMunique[rownames(CPMunique) %in% CellType$PeakName,] %>% data.frame()
+    #Get the geometric mean
+    CellData <- sapply(unique(CellType$symbol), function(gene){
+      GenePeaks = CellType %>% filter(symbol == gene) %>% .$PeakName
+      GeneData = CellDataAll[rownames(CellDataAll) %in% GenePeaks,]
+      if(nrow(GeneData) > 0){
+        
+        if(nrow(GeneData) > 1){
+          GeneMean = apply(GeneData, 2, mean) %>% data.frame() %>% t
+        } else {
+          GeneMean = GeneData
+        }
+        rownames(GeneMean) <- gene
+        GeneMean
+      }
+        
+    }, simplify = F)
+    
+    CellData <-  CellData[!sapply(CellData, is.null)] %>% do.call(rbind, .) %>% data.frame
+    
+
+    if(nrow(CellData) < 2){
+      NULL
+    } else {
+      temp <- prcomp(t(CellData), scale. = T)
+      sumPC1 = sum(temp$rotation[,1])
+      if(sumPC1 < 0){
+        temp$rotation[,1] <- -1*temp$rotation[,1]
+        temp$x[,1] <- -1*temp$x[,1]
+      }
+      while(sum(temp$rotation[,1] > 0) < nrow(temp$rotation)){
+        CellData <- CellData[rownames(CellData) %in% rownames(temp$rotation)[temp$rotation[,1] > 0],]
+        temp <- prcomp(t(CellData), scale. = T)
+        sumPC1 = sum(temp$rotation[,1])
+        if(sumPC1 < 0){
+          temp$rotation[,1] <- -1*temp$rotation[,1]
+          temp$x[,1] <- -1*temp$x[,1]
+        }
+      }
+      temp
+    }
+  })
+  PCAcellType <- PCAcellType[!unlist(lapply(PCAcellType, function(x) is.null(x)))]
+  #Remove cell types with < 3 peaks remaining
+  
+  names(PCAcellType) <- paste0(names(PCAcellType), "_MSP")
+  
+  VarianceExplained <- lapply(PCAcellType, function(cell){
+    temp <- cell %>% summary
+    if(length(temp) > 3){
+      c(temp$importance %>% .[2,], NA, NA)[1:3]
+    } 
+  }) %>% do.call(rbind,.) %>% data.frame %>%
+    mutate(Peaks = unlist(lapply(PCAcellType, function(x) nrow(x$rotation))))
+  rownames(VarianceExplained) <- names(PCAcellType)
+  
+  MSP_out <- lapply(PCAcellType, function(CellType){
+    rescale(CellType$x[,1], to = c(0,1))
+  }) %>% do.call(cbind, .) %>% data.frame %>% mutate(Sample = row.names(.))
+  
+  
+  
+  
+  Metadata <- merge(Metadata, MSP_out, by.x = MetaSamplCol, by.y = "Sample", sort = F)
+  
+  return(list(Metadata = Metadata,
+              CellTypeSpecificPeaks = CellTypeSpecificPeaks,
+              PCAcellType = PCAcellType,
+              VarianceExplained = VarianceExplained))
 }
 
 RunDESeq <- function(data, meta, normFactor=NULL, sampleToFilter = "none",  FullModel, ReducedModel = "~1", test = "Wald", UseModelMatrix = FALSE, FitType = "parametric", MetaSamleCol = "activemotif_id", SampleNameCol = "SampleName"){
@@ -543,13 +705,13 @@ Count2CPM <- function(countData){
 
 GetAdjCountDESeq <- function(dds, Gene,  adjCov){
   GeneRow <- which(rownames(dds) == Gene)
-  Mu <- log2(t(t(assays(dds)$mu[GeneRow,])/sizeFactors(dds)))
-  Counts <-  log2(t(t(assays(dds)$counts[GeneRow,])/sizeFactors(dds)))
+  Mu <- log2(t(t(assays(dds)$mu[GeneRow,])/sizeFactors(dds)) + 0.1)
+  Counts <-  log2(t(t(assays(dds)$counts[GeneRow,])/sizeFactors(dds)) + 0.1)
   Resid <- Counts - Mu
   corrFactor <- sizeFactors(dds)
   Coef <- coef(dds)[GeneRow,]
   mod <- attr(dds, "modelMatrix")
-  modAdj <-mod
+  modAdj <- mod
   for(cov in as.character(adjCov$Cov)){
     adjType = adjCov %>% filter(Cov == cov) %>% .$adjType %>% as.character()
     if(adjType == "mean"){
