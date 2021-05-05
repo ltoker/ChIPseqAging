@@ -282,6 +282,16 @@ PCA_resultsMean <- sapply(names(PCAresults[[1]]$modified), function(celltype){
 }, simplify=FALSE)
 
 
+#Get Human microglia expression from Galatro et al. 2017
+MicrogliaAging <- read.table("data/MicrogliaHumanAgingGalatro.txt", header = T, sep = "\t")
+MicogliaAll <- read.table("data/MicrogliaVsWholeBrainGalatro.txt", header = T, sep = "\t")
+
+MicrogliaSpecificHuman <- MicogliaAll %>% filter(gliaVSbrain_logFC > 3, adj.P.Val < 0.05) %>% .$GeneSymbol
+
+OverlapMicrogliaAll <- intersect(MicrogliaSpecificHuman, rownames(PCAresults$Boot_1$All$Microglia_Genes$rotation))
+OverlapAgeUP <- intersect((MicrogliaAging %>% filter(logFC > 0) %>% .$GeneSymbol), rownames(PCAresults$Boot_1$All$Microglia_Genes$rotation))
+OverlapAgeDown <- intersect((MicrogliaAging %>% filter(logFC < 0) %>% .$GeneSymbol), rownames(PCAresults$Boot_1$All$Microglia_Genes$rotation))
+
 #Add estimation to Metadata 
 AllEstimates <- lapply(PCA_resultsMean, function(x){
   x$MeanRot
@@ -343,13 +353,18 @@ lm(PC1~Age + Sex + DV200 + Oligo_Genes +
      Endothelial_Genes + Microglia_Genes +
      GabaPV_Genes + Astrocyte_Genes + Pyramidal_Genes +
      PostSynapseUnique_Genes + PreSynapseUnique_Genes +
-     Cohort, data = studyFinal$Metadata) %>% summary()
+     Cohort,
+   data = studyFinal$Metadata) %>% summary()
 
-lm(Age~ Sex + DV200 + Oligo_Genes +
-     Endothelial_Genes + Microglia_Genes +
-     GabaPV_Genes + Astrocyte_Genes + Pyramidal_Genes +
-     PostSynapseUnique_Genes + PreSynapseUnique_Genes +
-     Cohort, data = studyFinal$Metadata) %>% summary()
+lm(PC1~Microglia_Genes + PreSynapseUnique_Genes +
+     PostSynapseUnique_Genes,
+   data = studyFinal$Metadata) %>% summary()
+
+lm(Age ~ Sex + Oligo_Genes + Microglia_Genes +
+     Astrocyte_Genes + 
+     PreSynapseUnique_Genes,
+   data = studyFinal$Metadata) %>% summary()
+
 
 #Remove columns for cell types that were not estimated
 studyFinal$Metadata <- studyFinal$Metadata[,!apply(studyFinal$Metadata, 2, function(x){
@@ -359,7 +374,7 @@ studyFinal$Metadata <- studyFinal$Metadata[,!apply(studyFinal$Metadata, 2, funct
 AgeChanges <- sapply(names(studyFinal$Metadata)[grepl("_Genes",
                                                names(studyFinal$Metadata))],
                      function(celltype){
-                       lm(as.formula(paste0(celltype, "~Age + Sex + Cohort + DV200")),
+                       lm(as.formula(paste0(celltype, "~Age + Sex + Cohort")),
                           data = studyFinal$Metadata) %>% summary %>% .$coef
                      }, simplify = F)
 
@@ -372,7 +387,7 @@ AgeChangesDF <- sapply(names(AgeChanges), function(CellType){
 AgeChanges2 <- sapply(names(studyFinal$Metadata)[grepl("_Genes",
                                                       names(studyFinal$Metadata))],
                      function(celltype){
-                       lm(as.formula(paste0(celltype, "~Age + Sex + Cohort + DV200 + Microglia_Genes")),
+                       lm(as.formula(paste0(celltype, "~Age + Sex + Cohort + Microglia_Genes")),
                           data = studyFinal$Metadata) %>% summary %>% .$coef
                      }, simplify = F)
 
@@ -407,9 +422,9 @@ fgseaResultsRNAseq <- lapply(PathwaysList, function(PathType){
 
 Model2 = as.formula(~Agef + Sex + DV200 + Cohort + Oligo_Genes + Microglia_Genes + Pyramidal_Genes)
 
-DESeqOut2 <- DESeq2RUN(data =  studyFinal$countMatrix, Meta = studyFinal$Metadata, model = Model2)
+DESeqOut2 <- DESeq2runRNA(data =  studyFinal$countMatrix, Meta = studyFinal$Metadata, model = Model2)
 
-DESeqResults2 <- GetDESeq2Results(DESeqOut2, coef = "Agef.L")
+DESeqResults2 <- GetDESeq2ResultsRNA(DESeqOut2, coef = "Agef.L")
 
 Ranks2 = deframe(DESeqResults2 %>% filter(!duplicated(gene_name), !is.na(padj)) %>% select(gene_name, stat))
 
@@ -436,9 +451,8 @@ ggplot(temp %>% filter(gene_type == "protein_coding"), aes(stat_RNA, stat_ChIP))
   geom_hline(yintercept = 0, color = "red") +
   geom_vline(xintercept = 0, color = "red")
 
-#Lookinng only at promoters
-temp2 <- merge(DESeqResults %>% select(gene_name, stat, pvalue, padj, gene_type, EnsemblID),
-              ChIPResults %>% arrange(padj) %>% filter(region_type == "Promoters") %>%
+temp2 <- merge(DESeqResults2 %>% select(gene_name, stat, pvalue, padj, gene_type, EnsemblID),
+              ChIPResults %>% arrange(padj) %>%
                 filter(!duplicated(gene_id)) %>%
                 select(gene_id, stat, pvalue, padj),
               by.x = "EnsemblID", by.y = "gene_id", suffixes = c("_RNA", "_ChIP")) %>%
@@ -455,46 +469,284 @@ ggplot(temp2 %>% filter(gene_type == "protein_coding"), aes(stat_RNA, stat_ChIP)
 
 
 
-Ranks = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, DeltaStat))
+Ranks3 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, DeltaStat))
 
 fgseaResultsMostSignif <- lapply(PathwaysList, function(PathType){
-  fgseaMultilevel(pathways=PathType, stats=Ranks, nPermSimple = 10000)
+  fgseaMultilevel(pathways=PathType, stats=Ranks3, nPermSimple = 1000)
 })
 
-Ranks2 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, SameDirect))
+Ranks4 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, SameDirect))
 
 fgseaResultsMostSignifSame <- lapply(PathwaysList, function(PathType){
   fgseaMultilevel(pathways=PathType, stats=Ranks2, nPermSimple = 10000)
 })
 
 
-packageF("rGREAT")
+CreateAdjCovar <- function(dds){
+  temp <- attr(dds, "modelMatrix") %>%
+    data.frame() %>% select(-matches("Age|Interc"))
+  DF <- data.frame(Cov = names(temp))
+  DF$adjType <- apply(temp, 2, function(Cov){
+    if(sum(as.integer(Cov) != Cov) == 0){
+      "base"
+    } else {
+      "mean"
+    }
+  })
+  return(DF)
+}
 
-GetChIPenrich <- function(ChIPdata) {
-  HyperBed <- ChIPdata %>% filter(!duplicated(PeakName), padj < 0.05, log2FoldChange > 0) %>%
-    select(Peak.CHR, Peak.START, Peak.END, PeakName)
+AdjCountsWrap <- function(dds, genes = NULL){
+  if(is.null(genes)){
+    genes = rownames(dds)
+  }
   
-  HypoBed <- ChIPdata %>% filter(!duplicated(PeakName), padj < 0.05, log2FoldChange < 0) %>%
-    select(Peak.CHR, Peak.START, Peak.END, PeakName)
+  adjCov <- CreateAdjCovar(dds)
+
+  AdjRNA <- sapply(genes, function(gene){
+    temp <- GetAdjCountDESeq(dds = dds, gene, adjCov = adjCov)
+  })
+  rownames(AdjRNA) <- colnames(dds)
+  return(list(CovarDF = adjCov, AdjValDF = t(AdjRNA) %>% data.frame()))
+}
+
+AdjCovRNA <- AdjCountsWrap(DESeqOut)
+saveRDS(AdjCovRNA, paste0(ResultsPath, "AgingAdjCovRNA.Rds"))
+
+SubChIP <- ChIPResults %>%
+  filter(region_type == "Promoters",
+         !is.na(symbol),
+         gene_id %in% rownames(AdjCovRNA$AdjValDF), !is.na(padj)) %>%
+  filter(!duplicated(Peak_Gene))
+
+AdjCovChIP <- AdjCountsWrap(ChIPResultsOut, genes = SubChIP %>%
+                              filter(!duplicated(PeakName)) %>% .$PeakName)
+saveRDS(AdjCovChIP, paste0(ResultsPath, "AgingAdjCovChIPseq.Rds"))
+
+SlidingAge <- list()
+Start = 1
+End = 10
+
+while(End <= 40){
+  ageStart = sort(studyFinal$Metadata$Age)[Start]
+  ageEnd = sort(studyFinal$Metadata$Age)[End]
+  SlidingAge[[paste0("Age",ageStart, "_", ageEnd)]] <- studyFinal$Metadata %>%
+    arrange(Age) %>% select(Age, Biobank_ID,
+                            RNAseq_id_ParkOme2, ChIPseq_id) %>%
+    .[Start:End,] %>% mutate(ChIPseq_id = paste0("X", ChIPseq_id))
   
-  BackgroundRegionsBed <- ChIPdata %>% filter(!duplicated(PeakName),
-                                              !is.na(padj)) %>%
-    select(Peak.CHR, Peak.START, Peak.END, PeakName)
+  Start = Start + 5
+  End = End + 5
+}
+
+SampleGroups = SlidingAge
+GenePairs <- rownames(AdjCovRNA$AdjValDF)[rownames(AdjCovRNA$AdjValDF) %in% SubChIP$gene_id]
+
+# parallelize depending on the operating system
+packageF("doParallel")
+tempFun <- function(x){
+  library(magrittr)
+  library(dplyr)
+  library(data.table)
   
-  HyperRegions <- submitGreatJob(HyperBed, bg = BackgroundRegionsBed, species = "hg19")
-  GreatOut <- getEnrichmentTables(HyperRegions)
-  GreatOut2 <- plotRegionGeneAssociationGraphs(HyperRegions, type = 1)
+  AgeSamples = SampleGroups[[x]]
+  sapply(GenePairs, function(GeneID){
+    
+    subData = SubChIP[SubChIP$gene_id == GeneID,]
+    Peaks = subData %>% .$PeakName %>% unique
+    GeneType = subData %>% .$gene_type %>% unique
+    GeneSymbol = subData %>% .$symbol %>% unique
+    
+    PeakCor <- sapply(Peaks, function(PeakName){
+      RNAdata = AdjCovRNA$AdjValDF[rownames(AdjCovRNA$AdjValDF) == GeneID,] %>%
+        select(AgeSamples$RNAseq_id_ParkOme2) %>% unlist
+      ChIPdata = AdjCovChIP$AdjValDF[rownames(AdjCovChIP$AdjValDF) == PeakName,] %>%
+        select(AgeSamples$ChIPseq_id) %>% unlist
+      data.frame(GeneID = GeneID, PeakName = PeakName,
+                 GeneType = GeneType, GeneSymbol = GeneSymbol,
+                 Cor = cor(RNAdata, ChIPdata))
+    }, simplify = F) %>% rbindlist() %>% data.frame()
+    PeakCor %>% mutate(PairNum = nrow(.)) %>% arrange(desc(Cor))
+  }, simplify = F) %>% rbindlist %>% data.frame()
+}
+
+if(.Platform$OS.type == "windows") {
   
+  cl <- makeCluster(detectCores(), type = "PSOCK")  
+  registerDoParallel(cl)  
   
-  HypoRegions <- submitGreatJob(HypoBed, bg = BackgroundRegionsBed, species = "hg19")
-  GreatOutHypo <- getEnrichmentTables(HypoRegions)
-  GreatOutHypo2 <- plotRegionGeneAssociationGraphs(HypoRegions, type = 1)
-  return(list(HyperEnrich = GreatOut, HypoEnrich = GreatOutHypo,
-              HyperAnno = GreatOut2, HypoAnno = GreatOutHypo2))
+  clusterExport(cl, varlist = c("SampleGroups", "SubChIP",
+                                "AdjCovRNA", "AdjCovChIP",
+                                "GenePairs"))
+  
+  ChiP_RNAcorMax <- clusterApply(cl, x = names(SampleGroups), fun = tempFun)
+  names(ChiP_RNAcorMax) <- names(SampleGroups)
+  stopCluster(cl)
+} else {
+  ChiP_RNAcorMax <- mclapply(SampleGroups, function(AgeSamples){
+    sapply(GenePairs, function(GeneID){
+      subData = SubChIP[SubChIP$gene_id == GeneID,]
+      Peaks = subData %>% .$PeakName %>% unique
+      GeneType = subData %>% .$gene_type %>% unique
+      GeneSymbol = subData %>% .$gene_name %>% unique
+      PeakCor <- sapply(Peaks, function(PeakName){
+        RNAdata = AdjCovRNA$AdjValDF[rownames(AdjCovRNA$AdjValDF) == GeneID,] %>%
+          select(AgeSamples$RNAseq_id_ParkOme2) %>% unlist
+        ChIPdata = AdjCovChIP$AdjValDF[rownames(AdjCovChIP$AdjValDF) == PeakName,] %>%
+          select(AgeSamples$ChIPseq_id) %>% unlist
+        data.frame(GeneID = GeneID, PeakName = PeakName,
+                   GeneType = GeneType, GeneSymbol = GeneSymbol,
+                   Cor = cor(RNAdata, ChIPdata))
+      }, simplify = F) %>% rbindlist() %>% data.frame()
+      PeakCor %>% mutate(PairNum = nrow(.)) %>% arrange(desc(Cor))
+    }, simplify = F) %>% rbindlist %>% data.frame() 
+  }, mc.cores = detectCores())
 }
 
 
-DiscoveryAgingnrich <- GetChIPenrich(ChIPResults)
+ChiP_RNAcorMax <- sapply(names(ChiP_RNAcorMax), function(x){
+  ChiP_RNAcorMax[[x]] %>% mutate(AgeGroup = x,
+                                 GeneAge = paste0(GeneID, "_", AgeGroup),
+                                 GenePeak = paste0(GeneID, "_", PeakName))
+}, simplify = F)
+
+saveRDS(ChiP_RNAcorMax, paste0(ResultsPath, "ChiP_RNAcorMax.Rds"))
+
+CorAgeChange <- sapply(ChiP_RNAcorMax$Age17.9_55$GenePeak, function(GenePair){
+  Data = lapply(ChiP_RNAcorMax, function(AgeGroup){
+    AgeGroup %>% filter(GenePeak == GenePair)
+  }) %>% rbindlist() %>% data.frame()
+  Data$AgeGroupNum = 1:nrow(Data)
+  if(sum(!is.na(Data$Cor)) >= 4){
+    temp <- lm(Cor~AgeGroupNum, data = Data) %>%
+      summary() %>% .$coef %>% .[2,-2] %>% data.frame() %>% t()
+    colnames(temp) <- c("Est", "tStat", "pVal")
+
+  } else {
+    temp = data.frame("Est" = NA, "tStat" = NA, "pVal" = NA)
+  }
+
+  cbind(Data[1,] %>% select(GenePeak, GeneSymbol, PairNum), temp)
+
+}, simplify = F) %>% rbindlist() %>% data.frame()
+
+CorAgeChange$YoungCor = ChiP_RNAcorMax$Age17.9_55$Cor
+saveRDS(CorAgeChange, paste0(ResultsPath, "CorAgeChange.Rds"))
+
+ggplot(CorAgeChange, aes(YoungCor, Est)) + geom_point() + geom_smooth()
+
+
+YoungHigh <- ChiP_RNAcorMax$Age17.9_55 %>% filter(Cor > 0.5)
+YoungLow <- ChiP_RNAcorMax$Age17.9_55 %>% filter(Cor < -0.5)
+
+OldHigh <- ChiP_RNAcorMax$Age87_102 %>% filter(Cor > 0.4)
+OldLow <- ChiP_RNAcorMax$Age87_102 %>% filter(Cor < -0.4)
+
+
+
+ggplot(rbindlist(ChiP_RNAcorMax) %>% data.frame() %>%
+  filter(GenePeak %in% YoungHigh$GenePeak)) + geom_boxplot(aes(AgeGroup, Cor))
+
+ggplot(rbindlist(ChiP_RNAcorMax) %>% data.frame() %>%
+         filter(GenePeak %in% YoungLow$GenePeak)) + geom_boxplot(aes(AgeGroup, Cor))
+
+ggplot(rbindlist(ChiP_RNAcorMax) %>% data.frame() %>%
+  filter(GenePeak %in% OldLow$GenePeak)) + geom_boxplot(aes(AgeGroup, Cor))
+
+ggplot(rbindlist(ChiP_RNAcorMax) %>% data.frame() %>%
+         filter(GenePeak %in% OldHigh$GenePeak)) + geom_boxplot(aes(AgeGroup, Cor))
+
+
+#Create random correlations
+RandCorList <- list()
+for(i in c(1:10)){
+  SlidingAgeRand <- list()
+  Samples <- sample(studyFinal$Metadata$Biobank_ID, nrow(studyFinal$Metadata), replace = F)
+  Start = 1
+  End = 10
+  
+  while(End <= 40){
+    ageStart = studyFinal$Metadata[match(Samples, studyFinal$Metadata$Biobank_ID),]$Age[Start]
+    ageEnd = studyFinal$Metadata[match(Samples, studyFinal$Metadata$Biobank_ID),]$Age[End]
+    Data <- studyFinal$Metadata[match(Samples,
+                                      studyFinal$Metadata$Biobank_ID),] %>%
+      select(Age, Biobank_ID,
+             RNAseq_id_ParkOme2, ChIPseq_id) %>%
+      .[Start:End,] %>% mutate(ChIPseq_id = paste0("X", ChIPseq_id))
+    
+    SlidingAgeRand[[paste0("Age", min(Data$Age), "_", max(Data$Age))]] <- Data 
+    
+    Start = Start + 5
+    End = End + 5
+  }
+  
+  SampleGroups = SlidingAgeRand
+  
+  # parallelize depending on the operating system
+  if(.Platform$OS.type == "windows") {
+    
+    cl <- makeCluster(detectCores(), type = "PSOCK")  
+    registerDoParallel(cl)  
+    
+    clusterExport(cl, varlist = c("SampleGroups", "SubChIP",
+                                  "AdjCovRNA", "AdjCovChIP",
+                                  "GenePairs"))
+    
+    ChiP_RNAcorRand <- clusterApply(cl, x = names(SampleGroups), fun = tempFun)
+    names(ChiP_RNAcorRand) <- names(SampleGroups)
+    stopCluster(cl)
+  } else {
+    ChiP_RNAcorRand <- mclapply(SampleGroups, function(AgeSamples){
+      sapply(GenePairs, function(GeneID){
+        subData = SubChIP[SubChIP$gene_id == GeneID,]
+        Peaks = subData %>% .$PeakName %>% unique
+        GeneType = subData %>% .$gene_type %>% unique
+        GeneSymbol = subData %>% .$gene_name %>% unique
+        PeakCor <- sapply(Peaks, function(PeakName){
+          RNAdata = AdjCovRNA$AdjValDF[rownames(AdjCovRNA$AdjValDF) == GeneID,] %>%
+            select(AgeSamples$RNAseq_id_ParkOme2) %>% unlist
+          ChIPdata = AdjCovChIP$AdjValDF[rownames(AdjCovChIP$AdjValDF) == PeakName,] %>%
+            select(AgeSamples$ChIPseq_id) %>% unlist
+          data.frame(GeneID = GeneID, PeakName = PeakName,
+                     GeneType = GeneType, GeneSymbol = GeneSymbol,
+                     Cor = cor(RNAdata, ChIPdata))
+        }, simplify = F) %>% rbindlist() %>% data.frame()
+        PeakCor %>% mutate(PairNum = nrow(.)) %>% arrange(desc(Cor))
+      }, simplify = F) %>% rbindlist %>% data.frame() 
+    }, mc.cores = detectCores())
+  }
+  
+  
+  ChiP_RNAcorRand <- sapply(names(ChiP_RNAcorRand), function(x){
+    ChiP_RNAcorRand[[x]] %>% mutate(AgeGroup = x,
+                                    GeneAge = paste0(GeneID, "_", AgeGroup),
+                                    GenePeak = paste0(GeneID, "_", PeakName))
+  }, simplify = F)
+  
+  CorAgeChangeRand <- sapply(ChiP_RNAcorRand[[1]]$GenePeak, function(GenePair){
+    Data = lapply(ChiP_RNAcorRand, function(AgeGroup){
+      AgeGroup %>% filter(GenePeak == GenePair)
+    }) %>% rbindlist() %>% data.frame()
+    Data$AgeGroupNum = 1:nrow(Data)
+    if(sum(!is.na(Data$Cor)) >= 4){
+      temp <- lm(Cor~AgeGroupNum, data = Data) %>%
+        summary() %>% .$coef %>% .[2,-2] %>% data.frame() %>% t()
+      colnames(temp) <- c("Est", "tStat", "pVal")
+      
+    } else {
+      temp = data.frame("Est" = NA, "tStat" = NA, "pVal" = NA)
+    }
+    
+    cbind(Data[1,] %>% select(GenePeak, GeneSymbol, PairNum), temp)
+    
+  }, simplify = F) %>% rbindlist() %>% data.frame()
+  CorAgeChangeRand$YoungCor = ChiP_RNAcorRand[[1]]$Cor
+  RandCorList[[i]] <- list(SampleGroups = SlidingAgeRand,
+                           ChiP_RNAcorRand = ChiP_RNAcorRand,
+                           CorAgeChangeRand = CorAgeChangeRand)
+}
+
+saveRDS(RandCorList, paste0(ResultsPath, "RandCorList.Rds"))
 
 
 save.image(paste0(ResultsPath,"RNAseq.RData"))
