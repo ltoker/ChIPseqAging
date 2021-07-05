@@ -6,7 +6,7 @@ source("ProjectScripts/ProjectFunctions.R")
 ResultsDiscovery <- readRDS(paste0(DiscoveryResults, "/DESegResultsAge.L_FullAll.Rds"))
 Deseq2OutDiscovery <- readRDS(paste0(DiscoveryResults, "/DESeqOutAll_Full.Rds"))
 
-MarziAnalysis <- readRDS("AgingResults/OutputMarzi.Rds")
+MarziAnalysis <- readRDS("Results_Aging_v35lift37/OutputMarzi.Rds")
 
 
 DiseaseLDblocks <- list(AD = readRDS("data/LDblocks/LDsnpADRanges.Rds"),
@@ -131,6 +131,41 @@ ggplot(AllDiscovery , aes(Disease, -log10(pvalue))) +
   geom_hline(yintercept = MedianNeither, color = "red", linetype = "dashed")
 
 
-ggplot(AllDiscovery %>% filter(-log10(pvalue) < 2), aes(-log10(pvalue))) +
+ggplot(AllDiscovery, aes(-log10(pvalue))) +
   theme_minimal() +
-  geom_density(aes(fill = Disease), alpha = 0.3)
+  geom_density(aes(fill = Disease, color = Disease), alpha = 0.3)
+ggsave(paste0(ResultsPath, "LDlogPdist.pdf"), device = "pdf", width = 6, height = 5)
+
+AllDiscovery$Microglia <- "Not Microglia-enriched"
+AllDiscovery$Microglia[AllDiscovery$PeakName %in% (ChIPResults %>%
+                                                     filter(symbol %in% AllMicroglia$feature) %>% .$PeakName)] <- "Microglia-enriched"
+ggplot(AllDiscovery, aes(-log10(pvalue))) +
+  theme_minimal() +
+  geom_density(aes(fill = Disease, color = Disease), alpha = 0.3) +
+  geom_vline(xintercept = (AllDiscovery %>% arrange(pvalue) %>%
+                             filter(padj < 0.05) %>%
+                             .$pvalue %>% max %>%
+                             log10(.)*(-1)), lty = "dashed") +
+  facet_wrap(Direction~Microglia)
+
+
+#Look at the hypergeometric test after exclusion of Microglia peaks
+PeakInfoNM <- ChIPResults %>% select(PeakName, Peak.CHR, Peak.START, Peak.END,
+                                     Peak.width, baseMean, log2FoldChange, pvalue, padj) %>%
+  filter(!is.na(padj), PeakName %in% (AllDiscovery %>%
+                                        filter(Microglia == "Not Microglia-enriched") %>% .$PeakName)) %>%
+  filter(!duplicated(PeakName))
+
+names(PeakInfoNM) <- sapply(names(PeakInfoNM), function(x) gsub("Peak\\.", "", x)) 
+
+
+DiseasepeaksNM <- DiseaseLDEnrich$AD$Diseasepeaks %>% filter(PeakName %in% PeakInfoNM$PeakName)
+
+TotalTestableDiseasePeaksNM <- PeakInfoNM %>% filter(PeakName %in% DiseasepeaksNM$PeakName)
+SignifDiseasePeaksNM <- DiseasepeaksNM %>% filter(padj < 0.05) 
+
+TotalSignifPeaksNM <- PeakInfoNM %>% filter(padj < 0.05)
+
+HyperNoMicroglia <- phyper(nrow(SignifDiseasePeaksNM)-1, nrow(TotalTestableDiseasePeaksNM),
+                           nrow(PeakInfoNM)-nrow(TotalTestableDiseasePeaksNM),
+                           nrow(TotalSignifPeaksNM), lower.tail = F)
