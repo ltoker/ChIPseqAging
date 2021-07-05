@@ -1,6 +1,15 @@
+BiocManager::install("devtools")
+library(devtools)
+source_url("https://github.com/ltoker/GeneralRscripts/blob/main/generalFunc.R?raw=T")
+
+packageF("org.Hs.eg.db")
+packageF("GenomicFeatures")
+packageF("AnnotationDbi")
+
 AnnoLoc = "data/Annotations/"
-#AssemblyFilename = "gencode.v35.annotation.gff3.gz"
-AssemblyFilename = "gencode.v35lift37.annotation.gff3.gz"
+
+AssemblyFilename = "gencode.v35.annotation.gff3.gz"
+#AssemblyFilename = "gencode.v35lift37.annotation.gff3.gz"
 
 txdbFilename  = paste0(paste0(strsplit(AssemblyFilename, "\\.")[[1]][c(2,4)], collapse = "."), "_DB")
 AnnoFilename = paste0("annoFileCollapsed_", strsplit(txdbFilename, "\\.")[[1]][1], ".Rds")
