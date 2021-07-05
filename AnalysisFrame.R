@@ -1,4 +1,4 @@
-BiocManager::install("devtools", force = T)
+#BiocManager::install("devtools", force = T)
 library(devtools)
 source_url("https://github.com/ltoker/GeneralRscripts/blob/main/generalFunc.R?raw=T")
 
