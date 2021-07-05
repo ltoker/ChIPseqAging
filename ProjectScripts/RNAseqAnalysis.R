@@ -384,6 +384,7 @@ AgeChangesDF <- sapply(names(AgeChanges), function(CellType){
   data[2,c(1,4)] %>% data.frame() %>% mutate(CellType = CellType)
 }, simplify = F) %>% rbindlist()
 
+
 AgeChanges2 <- sapply(names(studyFinal$Metadata)[grepl("_Genes",
                                                       names(studyFinal$Metadata))],
                      function(celltype){
@@ -400,6 +401,51 @@ AgeChangesDF2 <- sapply(names(AgeChanges2), function(CellType){
 
 write.table(AgeChangesDF, paste0(ResultsPath, "CellTypeAgeRNA.tsv"), sep = "\t",
             row.names = F, col.names = T)
+write.table(AgeChangesDF, paste0(ResultsPath, "CellTypeAgeRNA.tsv"), sep = "\t",
+            row.names = F, col.names = T)
+
+
+AgeChangesCI <-  sapply(names(studyFinal$Metadata)[grepl("_Genes",
+                                                         names(studyFinal$Metadata))],
+                        function(celltype){
+                          lmOut <- lm(as.formula(paste0(celltype, "~Age + Sex + Cohort")),
+                                      data = studyFinal$Metadata)
+                          temp <- data.frame(Coef = lmOut %>% summary %>% .$coef %>%  .[2,1], Type = "Demographic adjustment")
+                          temp <- cbind(temp, t(confint(lmOut)[2,]) %>% data.frame())
+                          names(temp)[3:4] <- c("Low", "High")
+                          temp$CellType = gsub("Genes", "MGP", celltype)
+                          temp
+                        }, simplify = F) %>% rbindlist() %>% data.frame()
+
+AgeChangesCI_corrected <-  sapply(names(studyFinal$Metadata)[grepl("_Genes",
+                                                                   names(studyFinal$Metadata))],
+                                  function(celltype){
+                                    lmOut <- lm(as.formula(paste0(celltype, "~Age + Sex + Cohort + Microglia_Genes")),
+                                                data = studyFinal$Metadata)
+                                    temp <- data.frame(Coef = lmOut %>% summary %>% .$coef %>%  .[2,1],  Type = "Demographic and microglia adjustment")
+                                    temp <- cbind(temp, t(confint(lmOut)[2,]) %>% data.frame())
+                                    names(temp)[3:4] <- c("Low", "High")
+                                    temp$CellType = gsub("Genes", "MGP", celltype)
+                                    temp
+                                  }, simplify = F) %>% rbindlist() %>% data.frame()
+
+AgeChangesCIcombined <- rbind(AgeChangesCI, AgeChangesCI_corrected)
+
+AgeChangesCIcombined$CellType <- factor(AgeChangesCI$CellType, levels = c("Astrocyte_MGP", "Endothelial_MGP", "Microglia_MGP", "Microglia_activation_MGP",               
+                                                                          "Microglia_deactivation_MGP", "Oligo_MGP", "OligoPrecursors_MGP",
+                                                                          "GabaPV_MGP", "GabaRelnCalb_MGP", "GabaVIPReln_MGP", "Layer_6b_Pyra_MGP", 
+                                                                          "Pyramidal_MGP", "PostSynapse_MGP", "PreSynapse_MGP",
+                                                                          "PostSynapseUnique_MGP", "PreSynapseUnique_MGP"))
+
+ggplot(AgeChangesCIcombined[!grepl("Synapse", AgeChangesCIcombined$CellType),] %>% droplevels() , aes(CellType, Coef)) +
+  theme_bw(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(x = "", y = "Coeficient (95%CI)", size = 16) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Low, ymax = High)) +
+  geom_hline(yintercept = 0, color = "red", lty = "dashed") +
+  facet_wrap(~Type, nrow = 2)
+ggsave(paste0(ResultsPath, "MGPoutput.pdf"), device = "pdf", width = 6, height = 5, dpi = 300, useDingbats = F)
 
 rm(countMatrix, ExpDataCPM, GeneSymbolAll, CountTxt, countMatrix,
    mitoGenes, countMito, countMatrixFiltered, CommonTopGenes,
@@ -421,6 +467,7 @@ fgseaResultsRNAseq <- lapply(PathwaysList, function(PathType){
 
 
 Model2 = as.formula(~Agef + Sex + DV200 + Cohort + Oligo_Genes + Microglia_Genes + Pyramidal_Genes)
+studyFinal$Metadata %<>% mutate(ChIPsampleID = paste0("X", ChIPseq_id))
 
 DESeqOut2 <- DESeq2runRNA(data =  studyFinal$countMatrix, Meta = studyFinal$Metadata, model = Model2)
 
@@ -432,8 +479,77 @@ fgseaResultsRNAseq2 <- lapply(PathwaysList, function(PathType){
   fgseaMultilevel(pathways=PathType, stats=Ranks2, nPermSimple = 1000)
 })
 
+
+GOccTop <- rbind(fgseaResultsRNAseq$GOcc %>% data.frame %>% arrange(padj) %>%
+                   filter(padj < 0.05, size > 15, NES < 0, size < 1000) %>% head(10) %>%
+                   mutate(Mod = "Oligo and Microglia"),
+                 fgseaResultsRNAseq$GOcc %>% data.frame %>% arrange(padj) %>%
+                   filter(padj < 0.05, size > 15, NES > 0, size < 1000) %>% head(10) %>%
+                   mutate(Mod = "Oligo and Microglia"),
+                 fgseaResultsRNAseq2$GOcc %>% data.frame %>% arrange(padj) %>%
+                   filter(padj < 0.05, size > 15, NES < 0, size < 1000) %>% head(10) %>%
+                   mutate(Mod = "Oligo Microglia and Pyramidal"),
+                 fgseaResultsRNAseq2$GOcc %>% data.frame %>% arrange(padj) %>%
+                   filter(padj < 0.05, size > 15, NES > 0, size < 1000) %>% head(10) %>%
+                   mutate(Mod = "Oligo Microglia and Pyramidal"))
+
+GOccTop2 <- rbind(fgseaResultsRNAseq$GOcc %>% data.frame %>% arrange(padj) %>%
+                   filter(padj < 0.05, pathway %in% GOccTop$pathway) %>% 
+                   mutate(Mod = "Oligo and Microglia"),
+                  fgseaResultsRNAseq2$GOcc %>% data.frame %>% arrange(padj) %>%
+                    filter(padj < 0.05, pathway %in% GOccTop$pathway) %>% 
+                    mutate(Mod = "Oligo, Microglia and Pyramidal")) %>%
+  arrange(NES)
+GOccTop2$Direction <- sapply(GOccTop2$NES, function(x){
+  if(x < 0){
+    "Downregulated"
+  } else {
+    "Upregulated"
+  }
+})
+
+
+
+GOccTop2$pathway <- sapply(GOccTop2$pathway, function(x){
+  gsub("GO_", "", x)
+})
+
+#For visualization purposes, rearrange the GO terms
+
+DisplayPath <- GOccTop2$pathway %>% unique
+DisplayPath <- DisplayPath[c(1:5, 7:8, 10:12, 15, 14,  6, 9, 13,16, 17:28)]
+
+
+GOccTop2$pathway <- factor(GOccTop2$pathway, levels = rev(DisplayPath))
+ggplot(GOccTop2, aes(pathway, NES, fill = Direction)) +
+  theme_bw() +
+  geom_bar(stat = "identity") +
+  labs(x = "") +
+  scale_fill_manual(values = MoviePalettes$SpiritedAway[c(3, 7)]) +
+  coord_flip() +
+  facet_wrap(~Mod)
+ggsave(paste0(ResultsPath, "RNAseqEnrichTopCC.pdf"), device = "pdf", width = 10, height = 8)
+
+
+#Run the analysis without microglia correction
+Model3 = as.formula(~Agef + Sex + DV200 + Cohort + Oligo_Genes)
+
+DESeqOut3 <- DESeq2runRNA(data =  studyFinal$countMatrix, Meta = studyFinal$Metadata, model = Model3)
+
+DESeqResults3 <- GetDESeq2ResultsRNA(DESeqOut3, coef = "Agef.L")
+
+Ranks3 = deframe(DESeqResults3 %>% filter(!duplicated(gene_name), !is.na(padj)) %>% select(gene_name, stat))
+
+fgseaResultsRNAseq3 <- lapply(PathwaysList, function(PathType){
+  fgseaMultilevel(pathways=PathType, stats=Ranks3, nPermSimple = 1000)
+})
+
+
 ChIPResults <- readRDS(paste0(DiscoveryResults, "/DESegResultsAge.L_FullAll.Rds"))
 ChIPResultsOut <- readRDS(paste0(DiscoveryResults, "/DESeqOutAll_Full.Rds"))
+ChIPmeta <- colData(ChIPResultsOut) %>% data.frame
+studyFinal$Metadata %<>% mutate(ChIPsampleID = paste0("X", ChIPseq_id))
+
 
 #Selecting the most significant peak to represent a gene
 temp <- merge(DESeqResults %>% select(gene_name, stat, pvalue, padj, gene_type, EnsemblID),
@@ -467,19 +583,76 @@ ggplot(temp2 %>% filter(gene_type == "protein_coding"), aes(stat_RNA, stat_ChIP)
   geom_vline(xintercept = 0, color = "red")
 
 
+#Repeat with the model without microglia correction
+temp3 <- merge(DESeqResults3 %>% select(gene_name, stat, pvalue, padj, gene_type, EnsemblID),
+              ChIPResults %>% arrange(padj) %>% filter(region_type == "Promoters") %>%
+                select(gene_id, stat, pvalue, padj),
+              by.x = "EnsemblID", by.y = "gene_id", suffixes = c("_RNA", "_ChIP")) %>%
+  mutate(DeltaStat = stat_ChIP - stat_RNA,
+         SameDirect = stat_ChIP + stat_RNA) %>%
+  filter(!duplicated(gene_name))
 
+ggplot(temp3 %>% filter(gene_type == "protein_coding"), aes(stat_RNA, stat_ChIP)) +
+  theme_minimal() +
+  geom_density_2d_filled() +
+  geom_hline(yintercept = 0, color = "red") +
+  geom_vline(xintercept = 0, color = "red")
 
-Ranks3 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, DeltaStat))
+temp3 %>% filter(gene_name %in% PathwaysList$KEGG$KEGG_OXIDATIVE_PHOSPHORYLATION) %>%
+  ggplot(aes(stat_RNA, stat_ChIP)) +
+  theme_minimal() +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red") +
+  geom_vline(xintercept = 0, color = "red")
+
+temp %>% filter(gene_name %in% PathwaysList$KEGG$KEGG_OXIDATIVE_PHOSPHORYLATION) %>%
+  ggplot(aes(stat_RNA, stat_ChIP)) +
+  theme_minimal() +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red") +
+  geom_vline(xintercept = 0, color = "red")
+
+temp3 %>% filter(gene_name %in% rownames(PCAresults$Boot_4$All$Microglia_Genes$rotation)) %>%
+  ggplot(aes(stat_RNA, stat_ChIP)) +
+  theme_minimal() +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red") +
+  geom_vline(xintercept = 0, color = "red")
+
+temp %>% filter(gene_name %in% rownames(PCAresults$Boot_4$All$Microglia_Genes$rotation)) %>%
+  ggplot(aes(stat_RNA, stat_ChIP)) +
+  theme_minimal() +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red") +
+  geom_vline(xintercept = 0, color = "red")
+
+#Look at the enrichment 
+Ranks4 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, DeltaStat))
 
 fgseaResultsMostSignif <- lapply(PathwaysList, function(PathType){
-  fgseaMultilevel(pathways=PathType, stats=Ranks3, nPermSimple = 1000)
+  fgseaMultilevel(pathways=PathType, stats=Ranks4, nPermSimple = 1000)
 })
 
-Ranks4 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, SameDirect))
+Ranks5 = deframe(temp %>% filter(gene_type == "protein_coding") %>% select(gene_name, SameDirect))
 
 fgseaResultsMostSignifSame <- lapply(PathwaysList, function(PathType){
-  fgseaMultilevel(pathways=PathType, stats=Ranks2, nPermSimple = 10000)
+  fgseaMultilevel(pathways=PathType, stats=Ranks5, nPermSimple = 1000)
 })
+
+
+Ranks6 = deframe(temp3 %>% filter(gene_type == "protein_coding") %>% select(gene_name, DeltaStat))
+
+fgseaResultsMostSignif_noMicroglia <- lapply(PathwaysList, function(PathType){
+  fgseaMultilevel(pathways=PathType, stats=Ranks6, nPermSimple = 1000)
+})
+
+Ranks7 = deframe(temp3 %>% filter(gene_type == "protein_coding") %>% select(gene_name, SameDirect))
+
+fgseaResultsMostSignifSame_noMicoglia <- lapply(PathwaysList, function(PathType){
+  fgseaMultilevel(pathways=PathType, stats=Ranks7, nPermSimple = 1000)
+})
+
+
 
 
 CreateAdjCovar <- function(dds){
@@ -754,5 +927,75 @@ save(studyFinal, file = paste0(ResultsPath, "studyFinal.Rda"))
 save(PCAresults, file = paste0(ResultsPath, "PCAresults.Rda"))
 
 
+lmAdjMicroglia <- lm(Microglia_Genes~Age+Sex+Cohort + DV200, data = studyFinal$Metadata)
+studyFinal$Metadata$AdjMicroglia <- ModelAdj(lmAdjMicroglia,
+                                             adj=data.frame(effect = c("Sex", "Cohort", "DV200"), adjValue=c(0, 0, 80)))
+
+AdjMicrogliaPlot <- ggplot(studyFinal$Metadata, aes(Age, AdjMicroglia, color = Cohort)) +
+  theme_minimal() +
+  theme(legend.position = c(0.2,0.8)) +
+  labs(y = "Microglia MGP (Adjusted)") +
+  scale_color_manual(values = MoviePalettes$MadMaxDesert[c(1,7)]) +
+  geom_smooth(color = "black", size = 0.5) +
+  geom_point() 
+  
 
 
+lmModRiP <- lm(log(RiP_NormMeanRatioOrg)~Age + Sex + FinalBatch + NeuNall_MSP + Oligo_MSP, data = ChIPmeta)
+
+ChIPmeta$AdjustedRiP <- ModelAdj(lmModRiP,
+                                 adj=data.frame(effect = c("FinalBatch", "Sex",
+                                                           "NeuNall_MSP", "Oligo_MSP"), adjValue=c(0, 0, 0.5, 0.5)))
+
+AdjRiPPlot <- ggplot(ChIPmeta, aes(Age, AdjustedRiP, color = Cohort))+
+  theme_minimal() +
+  theme(legend.position = c(0.2,0.8)) +
+  labs(y = "log(Normalized RiP) (Adjusted)") +
+  scale_color_manual(values = MoviePalettes$MadMaxDesert[c(1,7)]) +
+  geom_smooth(color = "black", size = 0.5) +
+  geom_point(show.legend = F) 
+
+
+
+studyFinal$Metadata$AdjustedRiP <- ChIPmeta$AdjustedRiP[match(studyFinal$Metadata$ChIPsampleID, ChIPmeta$SampleID)]
+
+MicroRiPCorStat <- cor.test(~AdjMicroglia+AdjustedRiP, data = studyFinal$Metadata)
+
+MicroRiPcor <- ggplot(studyFinal$Metadata, aes(AdjMicroglia, AdjustedRiP, color = Cohort))+
+  theme_classic() +
+  labs(x = "Microglia MGP (Adjusted)", y = "log(Normalized RiP) (Adjusted)") +
+  geom_point(show.legend = F) +
+  scale_color_manual(values = MoviePalettes$MadMaxDesert[c(1,7)]) +
+  annotate("text", x = 0.3, y = 16.65, label = paste0("Cor =  ",
+                                                     signif(MicroRiPCorStat$estimate, digits = 2),
+                                                     ", p = ",
+                                                     signif(MicroRiPCorStat$p.value, digits = 2)))
+
+ggarrange(ggarrange(AdjMicrogliaPlot, AdjRiPPlot, nrow = 2), MicroRiPcor, nrow = 1)
+ggsave(paste0(ResultsPath, "MicrogliaRiPcor.pdf"), device = "pdf", width = 9, height = 5, useDingbats = F)
+
+
+ChIPResults %>% filter(symbol %in% (DESeqResults3 %>% filter(padj < 0.05, log2FoldChange > 0) %>% .$gene_name)) %>%
+  group_by(region_type) %>% summarise(n()) %>% data.frame()
+
+ChIPResults %>% filter(symbol %in% (DESeqResults3 %>% filter(padj < 0.05, log2FoldChange < 0) %>% .$gene_name)) %>%
+  group_by(region_type) %>% summarise(n()) %>% data.frame()
+
+
+GeneLength <- sapply((annoFileCollapsed %>% data.frame %>% filter(!is.na(symbol),
+                                                                  !gene_type %in%  c("snoRNA", "misc_RNA",
+                                                                                     "snRNA", "miRNA")) %>%
+                                                                    .$symbol %>% unique), function(gene){
+  Data = annoFileCollapsed %>% data.frame %>% filter(symbol == gene, region_type != "Up1to5Kb") %>% arrange(start)
+  data.frame(Symbol = gene, Length = Data$end[nrow(Data)] - Data$start[1])
+}, simplify = F) %>% rbindlist %>% data.frame
+
+GeneLength$GeneType <- annoFileCollapsed$gene_type[match(GeneLength$Symbol, annoFileCollapsed$symbol)]
+
+GeneLength %<>% filter(!GeneType %in%  c("snoRNA", "misc_RNA",
+                                        "snRNA", "miRNA", "sense_intronic"))
+GeneLength$DEgene <- "NS"
+GeneLength$DEgene[GeneLength$Symbol %in% (DESeqResults3 %>% filter(padj < 0.05, log2FoldChange < 0) %>% .$gene_name)] <- "AgeDown"
+GeneLength$DEgene[GeneLength$Symbol %in% (DESeqResults3 %>% filter(padj < 0.05, log2FoldChange > 0) %>% .$gene_name)] <- "AgeUp"
+
+ggplot(GeneLength %>%  filter(Length > 5000), aes(log(Length))) + geom_density(aes(fill = DEgene, color = DEgene), alpha = 0.3)
