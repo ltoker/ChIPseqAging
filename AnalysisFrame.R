@@ -10,12 +10,12 @@ Cohort = "Aging"
 
 source("ProjectScripts/Annotations.R") #This script defines the  assembly version 
                                        #of the annotations, adjust accordingly!
+closeAllConnections()
 
 ResultsPath = paste0("Results_", Cohort, "_", strsplit(AssemblyFilename, "\\.")[[1]][2])
 source("ProjectScripts/AnalysisAging.R")
 
 rm(list = ls(all.names = TRUE))
-closeAllConnections()
 
 #Run replication 
 Cohort = "MarziAD_OurPeaks"

@@ -237,9 +237,9 @@ CellEstimateList <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCo
 CellEstimateList2 <- GetCellularProportions2(AllCalledData$SampleInfo,
                                              AllCalledData$countsMatrixAnnot,
                                              MetaSamplCol = "SampleID", normCol = "MeanRatioOrg")
-CellEstimateList3 <- GetCellularProportions3(AllCalledData$SampleInfo,
-                                             AllCalledData$countsMatrixAnnot,
-                                             MetaSamplCol = "SampleID")
+#CellEstimateList3 <- GetCellularProportions3(AllCalledData$SampleInfo,
+#                                             AllCalledData$countsMatrixAnnot,
+#                                             MetaSamplCol = "SampleID")
 
 
 #Comparison to Human microglia expression from Galatro et al. 2017
@@ -248,7 +248,7 @@ MicogliaAll <- read.table("data/MicrogliaVsWholeBrainGalatro.txt", header = T, s
 
 MicrogliaSpecificHuman <- MicogliaAll %>% filter(gliaVSbrain_logFC > 3, adj.P.Val < 0.05) %>% .$GeneSymbol
 MicrogliaMSPgenes <- CellEstimateList$CellTypeSpecificPeaks$Microglia %>% filter(PeakName %in% rownames(CellEstimateList$PCAcellType$Microglia_MSP$rotation)) %>% .$symbol %>% unique
-MicrogliaMSPgenes <- rownames(CellEstimateList3$PCAcellType$Microglia_Genes_MSP$rotation)
+MicrogliaMSPgenes <- rownames(CellEstimateList$PCAcellType$Microglia_Genes_MSP$rotation)
 
 OverlapMicrogliaAll <- intersect(MicrogliaSpecificHuman, MicrogliaMSPgenes)
 OverlapAgeUP <- intersect((MicrogliaAging %>% filter(logFC > 0) %>% .$GeneSymbol), MicrogliaMSPgenes)
@@ -281,7 +281,8 @@ write.table(BackGroundBed, paste0(ResultsPath, "BackgroundCellPeaks.tsv"), sep =
 
 AllCalledData$SampleInfo <- CellEstimateList$Metadata
 
-countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)), collapseBy = "PeakName",CorMethod = "pearson",countSampleRegEx = "^X",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
+countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)), collapseBy = "PeakName",
+                                               CorMethod = "pearson",countSampleRegEx = "^X",MetaSamleCol = "SampleID", MetaSamleIDCol = "SampleID",
                                                FilterBy = "", meta = AllCalledData$SampleInfo, title = paste0("Sample correlation, ", Cohort))
 
 #Get the p-values for association of each covariates with the first 5 PCs
@@ -296,7 +297,7 @@ VarExplained <- PCAsamples %>% summary() %>% .$importance %>%
 
 
 CovarPvalues <- sapply(grep("^PC", names(countMatrixFullAllCalled$Metadata), value = T), function(PC){
-  temp <- lm(as.formula(paste0(PC, "~ Age + Sex + FinalBatch + Oligo_MSP + Microglia_MSP + Endothelial_MSP+ NeuNall_MSP")),
+  temp <- lm(as.formula(paste0(PC, "~ Age + Sex + FinalBatch + Oligo_MSP + Microglia_MSP + Astrocyte_MSP + Endothelial_MSP+ NeuNall_MSP")),
              data = countMatrixFullAllCalled$Metadata) %>% summary
   temp$coefficients[-1,4]
 }, simplify = F) %>% do.call(cbind, .) %>% data.frame()

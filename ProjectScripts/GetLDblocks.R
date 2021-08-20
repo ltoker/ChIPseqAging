@@ -1,3 +1,6 @@
+library(devtools)
+source_url("https://github.com/ltoker/GeneralRscripts/blob/main/generalFunc.R?raw=T")
+
 #LDlinkR access token: 6c4c60024204
 Token = "6c4c60024204"
 BiocManager::install("LDlinkR")
