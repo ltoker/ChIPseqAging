@@ -182,7 +182,6 @@ GetCollapsedMatrix <- function(countsMatrixAnnot, collapseBy, FilterBy, meta = M
   if(is.null(title)){
     title = paste0("Sample correlation (", FilterBy, ")")
   }
-  
   Data <- countsMatrixAnnot %>% select(matches(paste0(collapseBy, "|", countSampleRegEx))) %>% group_by(.dots = collapseBy) %>% summarise_if(is.numeric, sum, na.rm = TRUE) %>% data.frame
   names(Data)[grepl(collapseBy, names(Data))] <- "PeakName"
   subData <- Data[grepl(FilterBy, Data$PeakName),]

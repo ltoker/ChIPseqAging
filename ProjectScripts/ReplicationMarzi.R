@@ -122,7 +122,8 @@ AllCalledData <- GetCountMatrixHTseq(HTseqCounts, OtherNormRegEx = "^C1orf43_|^C
 
 
 ##### Get relative cell proportion for based on differential NeuN positive and negative cell H3K27ac peaks ##########  
-AllCalledData$SampleInfo <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
+CellEstimateList <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
+AllCalledData$SampleInfo <- CellEstimateList$Metadata
 
 
 countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)),
@@ -254,7 +255,8 @@ AllCalledData <- GetCountMatrixHTseq(HTseqCounts, OtherNormRegEx = "^C1orf43_|^C
 
 
 ##### Get relative cell proportion for based on differential NeuN positive and negative cell H3K27ac peaks ##########  
-AllCalledData$SampleInfo <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
+CellEstimateList <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCol = "SampleID")
+AllCalledData$SampleInfo <- CellEstimateList$Metadata
 
 
 countMatrixFullAllCalled <- GetCollapsedMatrix(countsMatrixAnnot = AllCalledData$countsMatrixAnnot %>% filter(!duplicated(.$PeakName)),
@@ -330,7 +332,6 @@ DESegResultsAge.L_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.L")
 DESegResultsAge.Q_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.Q") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 DESegResultsAge.C_FullAll <- GetDESeqResults(DESeqOutAll_Full2, coef = "Agef.C") %>% AnnotDESeqResult(CountAnnoFile = AllCalledData$countsMatrixAnnot, by.x = "PeakName", by.y = "PeakName")
 
-ggplot()
 
 saveRDS(list(DESeqOutMarziAD = DESeqOutAll_Full,
              DESegResultsAD = DESegResultsGroup_FullAll,
@@ -371,6 +372,7 @@ GetHypergeometric(Col1 = "padj", Col2 = "padj_Replic")
 
 temp <- AllThreeResults %>% filter(padj_Replic < 0.05, padj_Discov < 0.05) %>% select(PeakName, log2FoldChange, log2FoldChange_Discov) 
 temp$Direction <- apply(temp, 1, function(x){
+  browser()
   if(x[1]*x[2] > 0){
     "Same"
   } else {
