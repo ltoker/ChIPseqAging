@@ -237,6 +237,7 @@ CellEstimateList <- GetCellularProportions(AllCalledData$SampleInfo, MetaSamplCo
 CellEstimateList2 <- GetCellularProportions2(AllCalledData$SampleInfo,
                                              AllCalledData$countsMatrixAnnot,
                                              MetaSamplCol = "SampleID", normCol = "MeanRatioOrg")
+
 #CellEstimateList3 <- GetCellularProportions3(AllCalledData$SampleInfo,
 #                                             AllCalledData$countsMatrixAnnot,
 #                                             MetaSamplCol = "SampleID")
