@@ -10,6 +10,10 @@ packageF("org.Hs.eg.db")
 packageF("GenomicFeatures")
 packageF("AnnotationDbi")
 packageF("tabulizer")
+#install_github("https://github.com/PavlidisLab/ermineR")
+library(ermineR)
+packageF("fgsea")
+packageF("tibble")
 
 if(!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
@@ -970,4 +974,75 @@ PCAgo <- function(data, sampleRegEx = "SL", GOterm){
 AddGOmgpTometa <- function(Meta, MGP, IDcol = SampleIDcol){
   temp <- MGP[match(Meta[[IDcol]], names(MGP))]
   rescale(temp, c(0,1))
+}
+
+GetOneSidedPval <- function(ResultsObj, adjust = "BH", logFCcol = "log2FoldChange", GeneCol = "GeneSymbol", pvalCol = "pvalue"){
+  DESeqResultsDF <- data.frame(ResultsObj)
+  DESeqResultsDF$DownPval <- apply(DESeqResultsDF %>% select_(.dots = c(logFCcol, pvalCol)), 1, function(x){
+    if(x[1] < 0){
+      x[2]/2
+    } else {
+      1-x[2]/2
+    }
+  })
+  DESeqResultsDF$DownPvalAdj <- p.adjust(DESeqResultsDF$DownPval, adjust)
+  DESeqResultsDF$UpPval <- apply(DESeqResultsDF %>% select_(.dots = c(logFCcol, pvalCol)), 1, function(x){
+    if(x[1] > 0){
+      x[2]/2
+    } else {
+      1-x[2]/2
+    }
+  })
+  DESeqResultsDF$UpPvalAdj <- p.adjust(DESeqResultsDF$UpPval, adjust)
+  rownames(DESeqResultsDF) <- as.character(DESeqResultsDF[[GeneCol]])
+  return(DESeqResultsDF)
+}
+
+
+RunEnrich <- function(DEobj, Filter = T, GeneCol = "gene_name", ScoreCol = "pvalue",  minsize = 15, maxsize = 500, method = "both", ErmineJmod = "gsr", Pathways = PathwaysCombined){
+  if(Filter){
+    DEresultFiltered <- DEobj %>% filter(!is.na(padj)) %>% filter(!duplicated(gene_name))
+  } else {
+    DEresultFiltered <- DEobj
+  }
+  rownames(DEresultFiltered) <- DEresultFiltered[[GeneCol]]
+  EnrichList <- list()
+  if(method != "ErmineJ"){
+    Ranks = deframe(DEresultFiltered %>% select("gene_name", ScoreCol))
+    Pathways2 <- Pathways[lapply(Pathways, function(Ptwy){
+      length(Ptwy) >= minsize & length(Ptwy) <= maxsize
+    }) %>% unlist]
+    EnrichList$fgsea <- fgseaMultilevel(pathways=Pathways2, stats=Ranks, nPermSimple = 1000)
+    EnrichList$fgsea$GeneSet <- sapply(EnrichList$fgsea$pathway, function(x) strsplit(x, "__")[[1]][1])
+    EnrichList$fgsea$pathway <- sapply(EnrichList$fgsea$pathway, function(x) strsplit(x, "__")[[1]][2])
+  }
+  if(method != "FGSEA"){
+    if(ErmineJmod == "gsr"){
+      if(ScoreCol != "pvalue"){
+        ScoreColUp = ScoreCol
+        ScoreColDown = ScoreCol
+        bigIsBetterUp = T
+        bigIsBetterDown = F
+        logTrans = F
+      } else if (ScoreCol == "pvalue"){
+        DEresultFiltered <- GetOneSidedPval(DEresultFiltered, adjust = "BH", GeneCol = GeneCol)
+        ScoreColUp = "UpPval"
+        ScoreColDown = "DownPval"
+        bigIsBetterUp = F
+        bigIsBetterDown = F
+        logTrans = T
+      }
+      
+      EnrichUp =  gsr(scores = DEresultFiltered, scoreColumn = ScoreColUp, customGeneSets = Pathways, bigIsBetter = bigIsBetterUp, logTrans = logTrans, minClassSize = minsize, maxClassSize = maxsize)
+      EnrichUp$results %<>% select(-Name, -"Same as", -NumProbes) %>% mutate(Direction = "Up")
+      EnrichUp$results$GeneSet <- sapply(EnrichUp$results$ID, function(x) strsplit(x, "__")[[1]][1])
+      EnrichUp$results$ID <- sapply(EnrichUp$results$ID, function(x) strsplit(x, "__")[[1]][2])
+      EnrichDown = gsr(scores = DEresultFiltered, scoreColumn = ScoreColDown, customGeneSets = Pathways, bigIsBetter = bigIsBetterDown, logTrans = logTrans,  minClassSize = minsize, maxClassSize = maxsize)
+      EnrichDown$results %<>% select(-Name, -"Same as", -NumProbes) %>% mutate(Direction = "Down")
+      EnrichDown$results$GeneSet <- sapply(EnrichDown$results$ID, function(x) strsplit(x, "__")[[1]][1])
+      EnrichDown$results$ID <- sapply(EnrichDown$results$ID, function(x) strsplit(x, "__")[[1]][2])
+      EnrichList$ErmineJ <- list(EnrichUp = EnrichUp, EnrichDown = EnrichDown)
+    }
+  }
+  return(EnrichList)
 }

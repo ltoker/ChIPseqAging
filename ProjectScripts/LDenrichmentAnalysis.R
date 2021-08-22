@@ -6,7 +6,7 @@ source("ProjectScripts/ProjectFunctions.R")
 ResultsDiscovery <- readRDS(paste0(DiscoveryResults, "/DESegResultsAge.L_FullAll.Rds"))
 Deseq2OutDiscovery <- readRDS(paste0(DiscoveryResults, "/DESeqOutAll_Full.Rds"))
 
-MarziAnalysis <- readRDS("Results_Aging_v35lift37/OutputMarzi.Rds")
+MarziAnalysis <- readRDS(paste0(ResultsPath, "OutputMarzi.Rds"))
 
 
 DiseaseLDblocks <- list(AD = readRDS("data/LDblocks/LDsnpADRanges.Rds"),
@@ -92,6 +92,7 @@ DiseaseLDEnrich <- lapply(DiseaseLDblocks, function(disease){
 })
 
 temp <- data.frame(RandomP  = DiseaseLDEnrich$AD$RandomSignif %>% unlist())
+
 ggplot(temp, aes(-log10(RandomP))) +
   theme_minimal() +
   geom_density() +
@@ -136,8 +137,11 @@ ggplot(AllDiscovery, aes(-log10(pvalue))) +
   geom_density(aes(fill = Disease, color = Disease), alpha = 0.3)
 ggsave(paste0(ResultsPath, "LDlogPdist.pdf"), device = "pdf", width = 6, height = 5)
 
+
+
+##################### Keep updating #################################################################################################
 AllDiscovery$Microglia <- "Not Microglia-enriched"
-AllDiscovery$Microglia[AllDiscovery$PeakName %in% (ChIPResults %>%
+AllDiscovery$Microglia[AllDiscovery$PeakName %in% (ResultsDiscovery %>%
                                                      filter(symbol %in% AllMicroglia$feature) %>% .$PeakName)] <- "Microglia-enriched"
 ggplot(AllDiscovery, aes(-log10(pvalue))) +
   theme_minimal() +

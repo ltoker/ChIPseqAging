@@ -36,6 +36,7 @@ closeAllConnections()
 source("ProjectScripts/GetLDblocks.R") #If not using the existing ASDsnps.txt,
                                        #this would require manual editing of the file after creation
 
+rm(list = ls(all.names = TRUE))
 
 #Running the LD enrichment analysis
 Cohort = "Aging"
